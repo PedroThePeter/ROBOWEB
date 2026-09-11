@@ -3,7 +3,7 @@ import axios from 'axios';
 import { UploadCloud, BarChart2, Hash, Settings, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://roboweb-cvha.onrender.com/api';
 
 const PRESETS = {
   megasena: { name: 'Mega-Sena', total: 6, range: 60 },
