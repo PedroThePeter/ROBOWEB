@@ -1,80 +1,106 @@
-import uuid
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
-# Importa o seu arquivo de lógica
-from services import analyzer
+import pandas as pd
+import uuid
+import random
 
 app = FastAPI()
 
-# --- CONFIGURAÇÃO DE SEGURANÇA (CORS) ---
+# 1. Configuração do CORS (permite que a Vercel acesse este backend)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- MODELOS DE DADOS ---
+# Modelo para a requisição de geração de palpites
 class GenerateRequest(BaseModel):
     session_id: str
-    total_numbers: int
-    number_range: int
-    fixed_numbers: list[int] = []
-    excluded_numbers: list[int] = []
-    ticket_count: int = 5
+    count: int = 5
+    total_numbers: int = 15
+    range: int = 25
 
-# --- ROTAS DA API ---
+# "Banco de dados" temporário na memória
+sessions_db = {}
 
+@app.get("/")
+def read_root():
+    return {"status": "LottoAI API Lotofácil rodando com sucesso!"}
+
+# 2. ROTA DE UPLOAD DO EXCEL / CONFRONTO
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
-    if not file.filename.endswith('.xlsx'):
-        raise HTTPException(status_code=400, detail="Formato inválido. Envie um arquivo .xlsx")
-    
-    session_id = str(uuid.uuid4())
-    temp_path = f"temp_{session_id}.xlsx"
-    
-    # Salva o arquivo temporariamente
-    with open(temp_path, "wb") as buffer:
-        buffer.write(await file.read())
-        
+async def upload_excel(file: UploadFile = File(...)):
     try:
-        # AQUI É O SEGREDO: Chama a SUA função para salvar a planilha na memória do analyzer
-        info = analyzer.process_upload(temp_path, session_id)
-        return {"session_id": session_id, "message": "Upload realizado com sucesso!", "info": info}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Lê o arquivo enviado (Excel ou CSV)
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(file.file)
+        else:
+            df = pd.read_excel(file.file)
 
-@app.get("/api/stats/{session_id}")
-async def get_stats(session_id: str):
-    try:
-        # Puxa os dados estatísticos usando o ID da sessão
-        stats = analyzer.calculate_stats(session_id) 
-        return stats
-    except ValueError as ve:
-        raise HTTPException(status_code=404, detail=str(ve))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        if df.empty:
+            raise HTTPException(status_code=400, detail="A planilha enviada está vazia.")
 
-@app.post("/api/generate-tickets")
-async def generate_tickets(req: GenerateRequest):
-    try:
-        # O seu código precisa das estatísticas ('stats') para gerar os pesos
-        stats = analyzer.calculate_stats(req.session_id)
+        # EXTRAI O ÚLTIMO SORTEIO (Última linha da planilha)
+        last_row = df.iloc[-1]
+        last_draw = []
+        for val in last_row.values:
+            try:
+                num = int(val)
+                if 1 <= num <= 25:
+                    last_draw.append(num)
+            except (ValueError, TypeError):
+                continue
         
-        # O seu código espera um dicionário 'config', então montamos ele aqui:
-        config = {
-            'total_numbers': req.total_numbers,
-            'number_range': req.number_range,
-            'fixed_numbers': req.fixed_numbers,
-            'excluded_numbers': req.excluded_numbers,
-            'ticket_count': req.ticket_count
+        # Garante exatamente 15 dezenas únicas e ordenadas
+        last_draw = sorted(list(set(last_draw)))[:15]
+
+        # CALCULA A FREQUÊNCIA DAS DEZENAS (1 a 25)
+        all_numbers = []
+        for col in df.columns:
+            for val in df[col].values:
+                try:
+                    num = int(val)
+                    if 1 <= num <= 25:
+                        all_numbers.append(num)
+                except (ValueError, TypeError):
+                    continue
+
+        counts = pd.Series(all_numbers).value_counts()
+        frequencies = [
+            {"number": i, "count": int(counts.get(i, 0))}
+            for i in range(1, 26)
+        ]
+
+        # Cria a sessão
+        session_id = str(uuid.uuid4())
+        sessions_db[session_id] = {
+            "frequencies": frequencies,
+            "last_draw": last_draw
         }
-        
-        # Chama a função de gerar passando o config e os stats
-        tickets = analyzer.generate_tickets(config, stats)
-        return {"tickets": tickets}
+
+        # ESTRUTURA DO JSON RETORNADO PARA O REACT
+        return {
+            "session_id": session_id,
+            "stats": {
+                "frequencies": frequencies
+            },
+            "last_draw": last_draw
+        }
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Erro ao processar planilha: {str(e)}")
+
+# 3. ROTA PARA GERAR PALPITES DA LOTOFÁCIL
+@app.post("/api/generate")
+async def generate_tickets(req: GenerateRequest):
+    tickets = []
+    
+    # Gera cartões com 15 dezenas entre 1 e 25
+    for _ in range(req.count):
+        ticket = sorted(random.sample(range(1, req.range + 1), req.total_numbers))
+        tickets.append(ticket)
+
+    return {"tickets": tickets}
