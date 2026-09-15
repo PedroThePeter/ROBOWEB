@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { UploadCloud, BarChart2, History, Cpu, CheckCircle, Zap, Flame, RefreshCw } from 'lucide-react';
+import { UploadCloud, BarChart2, History, Cpu, CheckCircle, Zap, Flame, RefreshCw, Play, Award, TrendingUp } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://roboweb-cvha.onrender.com/api';
@@ -16,6 +16,13 @@ export default function App() {
   const [history, setHistory] = useState([]);
   const [lastDrawnNumbers, setLastDrawnNumbers] = useState([]);
   const [mlMessage, setMlMessage] = useState('');
+
+  // Estados do Backtest Automático
+  const [backtestFile, setBacktestFile] = useState(null);
+  const [testDraws, setTestDraws] = useState(10);
+  const [ticketsPerDraw, setTicketsPerDraw] = useState(12);
+  const [backtestResults, setBacktestResults] = useState(null);
+  const [backtestLoading, setBacktestLoading] = useState(false);
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('lottoai_history');
@@ -33,6 +40,7 @@ export default function App() {
     const file = e.target.files[0];
     if (!file) return;
 
+    setBacktestFile(file);
     setLoading(true);
     const formData = new FormData();
     formData.append('file', file);
@@ -115,6 +123,29 @@ export default function App() {
     }
   };
 
+  const handleRunBacktest = async (e) => {
+    e.preventDefault();
+    if (!backtestFile) {
+      alert('Faça o upload da planilha no painel esquerdo para executar o Backtest.');
+      return;
+    }
+
+    setBacktestLoading(true);
+    const formData = new FormData();
+    formData.append('file', backtestFile);
+    formData.append('test_draws', testDraws);
+    formData.append('tickets_per_draw', ticketsPerDraw);
+
+    try {
+      const res = await axios.post(`${API_URL}/backtest`, formData);
+      setBacktestResults(res.data);
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Erro ao executar o Backtest.');
+    } finally {
+      setBacktestLoading(false);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-slate-900 text-slate-100 font-sans">
       {/* LATERAL ESQUERDA */}
@@ -127,7 +158,7 @@ export default function App() {
         <div className="border-2 border-dashed border-slate-600 rounded-lg p-6 text-center hover:border-emerald-400 transition cursor-pointer relative bg-slate-800/50">
           <input type="file" onChange={handleUpload} accept=".xlsx, .xls, .csv" className="absolute inset-0 opacity-0 cursor-pointer" />
           <UploadCloud className="w-10 h-10 mx-auto text-slate-400 mb-2" />
-          <p className="text-sm text-slate-300 font-medium">Atualizar Histórico (.xlsx)</p>
+          <p className="text-sm text-slate-300 font-medium">{backtestFile ? backtestFile.name : 'Atualizar Histórico (.xlsx)'}</p>
         </div>
 
         {mlMessage && (
@@ -184,13 +215,19 @@ export default function App() {
           >
             <History className="w-4 h-4" /> Histórico & Confrontos
           </button>
+          <button 
+            onClick={() => setActiveTab('backtest')} 
+            className={`px-6 py-4 flex items-center gap-2 font-medium text-sm border-b-2 transition ${activeTab === 'backtest' ? 'border-emerald-400 text-emerald-400 bg-slate-800' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+          >
+            <TrendingUp className="w-4 h-4" /> Backtest Automático
+          </button>
         </div>
 
+        {/* TAB 1: ESTATÍSTICAS */}
         {activeTab === 'stats' && (
           <div className="flex-1 p-6 overflow-y-auto space-y-6">
             {stats ? (
               <>
-                {/* CARDS DE CICLO E ATRASO */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-slate-800 border border-slate-700 p-4 rounded-xl">
                     <h3 className="text-sm font-semibold text-amber-400 flex items-center gap-2 mb-3">
@@ -227,7 +264,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* GRÁFICO DE FREQUÊNCIA */}
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-slate-300">Frequência das Dezenas</h3>
                   <div className="h-72 bg-slate-800 p-4 rounded-xl border border-slate-700">
@@ -252,7 +288,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ABA HISTÓRICO */}
+        {/* TAB 2: HISTÓRICO */}
         {activeTab === 'history' && (
           <div className="flex-1 p-6 overflow-y-auto space-y-6">
             <h2 className="text-xl font-bold text-slate-200 flex items-center gap-2">
@@ -312,6 +348,99 @@ export default function App() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* TAB 3: BACKTEST AUTOMÁTICO */}
+        {activeTab === 'backtest' && (
+          <div className="flex-1 p-6 overflow-y-auto space-y-6">
+            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="w-6 h-6 text-emerald-400" />
+                <div>
+                  <h2 className="text-lg font-bold text-slate-100">Simulação de Walk-Forward (Backtest Cego)</h2>
+                  <p className="text-xs text-slate-400">O sistema retém os últimos N sorteios do histórico para testar a precisão da IA em dados não vistos.</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleRunBacktest} className="grid grid-cols-3 gap-4 pt-2 border-t border-slate-700">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Sorteios para Reter (Futuro Cego)</label>
+                  <input 
+                    type="number" min="1" max="50" 
+                    value={testDraws} 
+                    onChange={(e) => setTestDraws(Number(e.target.value))} 
+                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm focus:border-emerald-400 outline-none" 
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Palpites Gerados por Sorteio</label>
+                  <input 
+                    type="number" min="1" max="50" 
+                    value={ticketsPerDraw} 
+                    onChange={(e) => setTicketsPerDraw(Number(e.target.value))} 
+                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm focus:border-emerald-400 outline-none" 
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button 
+                    type="submit" 
+                    disabled={backtestLoading}
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2 rounded transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                  >
+                    <Play className="w-4 h-4 fill-slate-950" />
+                    {backtestLoading ? 'Executando Backtest...' : 'Executar Backtest'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* RESULTADOS DO BACKTEST */}
+            {backtestResults && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-5 gap-3">
+                  <div className="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
+                    <span className="text-xs text-slate-400 block font-medium">11 Pontos</span>
+                    <span className="text-2xl font-bold text-emerald-400">{backtestResults["11_pontos"]}</span>
+                  </div>
+                  <div className="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
+                    <span className="text-xs text-slate-400 block font-medium">12 Pontos</span>
+                    <span className="text-2xl font-bold text-emerald-400">{backtestResults["12_pontos"]}</span>
+                  </div>
+                  <div className="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
+                    <span className="text-xs text-slate-400 block font-medium">13 Pontos</span>
+                    <span className="text-2xl font-bold text-amber-400">{backtestResults["13_pontos"]}</span>
+                  </div>
+                  <div className="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
+                    <span className="text-xs text-slate-400 block font-medium">14 Pontos</span>
+                    <span className="text-2xl font-bold text-rose-400">{backtestResults["14_pontos"]}</span>
+                  </div>
+                  <div className="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
+                    <span className="text-xs text-slate-400 block font-medium">15 Pontos</span>
+                    <span className="text-2xl font-bold text-purple-400">{backtestResults["15_pontos"]}</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-700 pb-3">
+                    <h3 className="font-semibold text-slate-200 flex items-center gap-2 text-sm">
+                      <Award className="w-4 h-4 text-emerald-400" /> Detalhamento das Simulações ({backtestResults.total_bilhetes_gerados} bilhetes no total)
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {backtestResults.simulations?.map((sim, idx) => (
+                      <div key={idx} className="bg-slate-900/70 p-3 rounded-lg border border-slate-700/50 flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-300">{sim.concurso_simulado}</span>
+                        <span className={`text-xs px-2.5 py-1 rounded font-bold ${sim.melhor_acerto >= 11 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'}`}>
+                          Melhor: {sim.melhor_acerto} acertos
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

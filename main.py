@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
@@ -64,7 +64,7 @@ async def upload_excel(file: UploadFile = File(...)):
                 continue
         last_draw = sorted(list(set(last_draw)))[:15]
 
-        # 2. Frequência total
+        # 2. Frequência total e parsing de sorteios
         all_numbers = []
         rows_list = []
         for _, row in df.iterrows():
@@ -86,7 +86,7 @@ async def upload_excel(file: UploadFile = File(...)):
             for i in range(1, 26)
         ]
 
-        # 3. Termômetro de Atraso (quantos sorteios seguidos a dezena não sai)
+        # 3. Termômetro de Atraso
         delays = []
         for i in range(1, 26):
             delay_count = 0
@@ -96,7 +96,7 @@ async def upload_excel(file: UploadFile = File(...)):
                 delay_count += 1
             delays.append({"number": i, "delay": delay_count})
 
-        # 4. Análise de Ciclo (dezenas que faltam sair no ciclo atual)
+        # 4. Análise de Ciclo
         seen_in_cycle = set()
         for row in reversed(rows_list):
             new_seen = seen_in_cycle | set(row)
@@ -127,7 +127,6 @@ async def generate_tickets(req: GenerateRequest):
     attempts = 0
     max_attempts = 1000
 
-    # Gera palpites aplicando a filtragem da IA
     while len(tickets) < req.count and attempts < max_attempts:
         attempts += 1
         candidate = sorted(random.sample(range(1, req.range + 1), req.total_numbers))
@@ -136,3 +135,78 @@ async def generate_tickets(req: GenerateRequest):
             tickets.append(candidate)
 
     return {"tickets": tickets}
+
+@app.post("/api/backtest")
+async def run_backtest(
+    file: UploadFile = File(...), 
+    test_draws: int = Form(10), 
+    tickets_per_draw: int = Form(12)
+):
+    try:
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(file.file)
+        else:
+            df = pd.read_excel(file.file)
+
+        # Extrai todos os sorteios válidos
+        all_draws = []
+        for _, row in df.iterrows():
+            row_nums = []
+            for val in row.values:
+                try:
+                    n = int(val)
+                    if 1 <= n <= 25:
+                        row_nums.append(n)
+                except (ValueError, TypeError):
+                    continue
+            if len(row_nums) >= 15:
+                all_draws.append(sorted(list(set(row_nums))[:15]))
+
+        if len(all_draws) <= test_draws:
+            raise HTTPException(status_code=400, detail="Planilha muito pequena para o tamanho do teste.")
+
+        # Separa os últimos N sorteios para a simulação cega
+        future_draws = all_draws[-test_draws:]
+
+        results = {
+            "11_pontos": 0,
+            "12_pontos": 0,
+            "13_pontos": 0,
+            "14_pontos": 0,
+            "15_pontos": 0,
+            "total_bilhetes_gerados": test_draws * tickets_per_draw,
+            "simulations": []
+        }
+
+        # Simula a validação para cada concurso retido
+        for i, actual_draw in enumerate(future_draws):
+            tickets = []
+            attempts = 0
+            
+            while len(tickets) < tickets_per_draw and attempts < 2000:
+                attempts += 1
+                candidate = sorted(random.sample(range(1, 26), 15))
+                if validate_ticket(candidate) and candidate not in tickets:
+                    tickets.append(candidate)
+
+            draw_hits = []
+            for t in tickets:
+                hits = len(set(t) & set(actual_draw))
+                draw_hits.append(hits)
+                
+                if hits == 11: results["11_pontos"] += 1
+                elif hits == 12: results["12_pontos"] += 1
+                elif hits == 13: results["13_pontos"] += 1
+                elif hits == 14: results["14_pontos"] += 1
+                elif hits == 15: results["15_pontos"] += 1
+
+            results["simulations"].append({
+                "concurso_simulado": f"Concurso Retido #{i+1}",
+                "melhor_acerto": max(draw_hits) if draw_hits else 0,
+                "acertos_detalhados": draw_hits
+            })
+
+        return results
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro no backtest: {str(e)}")
