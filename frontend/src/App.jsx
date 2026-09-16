@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API_URL = 'https://roboweb-cvha.onrender.com/api'; // Lembre-se de colocar a sua URL real do Render aqui se necessário
+const API_URL = 'https://roboweb-cvha.onrender.com/api';
 
 export default function App() {
   const [file, setFile] = useState(null);
@@ -18,7 +18,29 @@ export default function App() {
   const [backtestResults, setBacktestResults] = useState(null);
   const [backtestLoading, setBacktestLoading] = useState(false);
 
-  // Upload da planilha principal
+  // 🔄 CARREGAMENTO AUTOMÁTICO AO ABRIR / APERTAR F5
+  useEffect(() => {
+    const fetchAutoStatus = async () => {
+      try {
+        setLoading(true);
+        // Busca os dados da planilha oficial que está salva na nuvem
+        const res = await axios.get(`${API_URL}/status`);
+        if (res.data && res.data.session_id) {
+          setSession(res.data.session_id);
+          setStats(res.data.stats);
+          setLastDraw(res.data.last_draw || []);
+        }
+      } catch (err) {
+        console.log('Aguardando envio manual ou inicialização do servidor...');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAutoStatus();
+  }, []);
+
+  // Upload da planilha principal (Opcional, para caso queira trocar de planilha)
   const handleFileUpload = async (e) => {
     const uploadedFile = e.target.files[0];
     if (!uploadedFile) return;
@@ -44,7 +66,7 @@ export default function App() {
   const handleGenerate = async (e) => {
     e.preventDefault();
     if (!session) {
-      alert('Faça o upload de uma planilha primeiro.');
+      alert('Aguarde a conexão com o banco de dados.');
       return;
     }
 
@@ -67,14 +89,14 @@ export default function App() {
   // Executar Backtest
   const handleRunBacktest = async (e) => {
     e.preventDefault();
-    if (!file) {
-      alert('Faça o upload da planilha principal primeiro.');
+    if (!session && !file) {
+      alert('Aguarde a conexão com o histórico.');
       return;
     }
 
     setBacktestLoading(true);
     const formData = new FormData();
-    formData.append('file', file);
+    if (file) formData.append('file', file);
     formData.append('test_draws', testDraws);
     formData.append('bets_per_draw', ticketsPerDraw);
     if (session) formData.append('session_id', session);
@@ -101,10 +123,10 @@ export default function App() {
           </div>
           <div>
             <label className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer shadow-lg transition">
-              <span>{file ? '📁 Alterar Planilha' : '📁 Carregar Histórico (.xlsx/.csv)'}</span>
+              <span>{file ? '📁 Planilha Personalizada' : '📁 Alterar Planilha Base'}</span>
               <input type="file" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} className="hidden" />
             </label>
-            {session && <span className="block text-[10px] text-emerald-400 mt-1 text-center">✓ Conectado e pronto</span>}
+            {session && <span className="block text-[10px] text-emerald-400 mt-1 text-center">✓ Conectado e Atualizado (Caixa)</span>}
           </div>
         </header>
 
@@ -157,7 +179,7 @@ export default function App() {
             
             {tickets.length === 0 ? (
               <div className="h-48 flex items-center justify-center text-slate-600 text-xs border border-dashed border-slate-800 rounded-xl">
-                Nenhum bilhete gerado. Faça o upload da planilha e clique em gerar.
+                Nenhum bilhete gerado. Clique em "Gerar Palpites 🤖".
               </div>
             ) : (
               <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
@@ -207,7 +229,7 @@ export default function App() {
               </div>
               <button 
                 type="submit" 
-                disabled={backtestLoading || !file}
+                disabled={backtestLoading || !session}
                 className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-emerald-400 border border-emerald-500/30 font-semibold text-xs py-2 px-4 rounded-lg transition"
               >
                 {backtestLoading ? 'Treinando...' : 'Rodar Backtest 🚀'}
