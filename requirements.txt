@@ -7,3 +7,4 @@ joblib
 requests
 urllib3
 openpyxl
+python-multipart
