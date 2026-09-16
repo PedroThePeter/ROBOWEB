@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const API_URL = 'https://robo-lotofacil-xyz.onrender.com/api'; // Lembre-se de colocar a sua URL real do Render aqui se necessário
+const API_URL = 'https://roboweb-cvha.onrender.com/api'; // Lembre-se de colocar a sua URL real do Render aqui se necessário
 
 export default function App() {
   const [file, setFile] = useState(null);
