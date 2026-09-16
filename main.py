@@ -3,10 +3,15 @@ import io
 import joblib
 import pandas as pd
 import numpy as np
+import requests
+import urllib3
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sklearn.ensemble import RandomForestClassifier
+
+# Desativa avisos de segurança SSL (o site da Caixa às vezes tem certificados antigos)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = FastAPI()
 
@@ -31,16 +36,88 @@ class GenerateRequest(BaseModel):
     total_numbers: int = 15
     range: int = 25
 
+def sincronizar_com_caixa(df, filepath):
+    """Busca novos resultados na API da Caixa e atualiza a planilha salva."""
+    try:
+        # Descobre qual é a coluna do número do concurso
+        col_concurso = [c for c in df.columns if 'concurso' in str(c).lower()]
+        if not col_concurso:
+            print("Não foi possível achar a coluna de Concurso. Sincronização ignorada.")
+            return df
+        
+        nome_col_concurso = col_concurso[0]
+        # Pega o número do último concurso que temos salvo
+        ultimo_concurso_salvo = int(df.iloc[-1][nome_col_concurso])
+        concurso_a_buscar = ultimo_concurso_salvo + 1
+        
+        novos_dados = []
+        print(f"Verificando se existem novos sorteios após o concurso {ultimo_concurso_salvo}...")
+
+        while True:
+            # URL oficial da API da Caixa para um concurso específico
+            url = f"https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil/{concurso_a_buscar}"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            
+            resposta = requests.get(url, headers=headers, verify=False, timeout=10)
+            
+            if resposta.status_code == 200:
+                dados = resposta.json()
+                
+                # Formata as dezenas recebidas da internet
+                dezenas = sorted([int(x) for x in dados['dezenasSorteadasOrdemSorteio']])
+                print(f"✅ Novo concurso {concurso_a_buscar} encontrado na internet! Dezenas: {dezenas}")
+                
+                # Prepara a nova linha para a planilha
+                nova_linha = {c: '' for c in df.columns} # Começa vazia
+                nova_linha[nome_col_concurso] = dados['numero']
+                
+                # Adiciona a data se a coluna existir
+                col_data = [c for c in df.columns if 'data' in str(c).lower()]
+                if col_data:
+                    nova_linha[col_data[0]] = dados['dataApuracao']
+                
+                # Mapeia as 15 bolas para as respectivas colunas
+                cols_dezenas = [c for c in df.columns if 'bola' in str(c).lower() or 'dez' in str(c).lower() or 'num' in str(c).lower()]
+                if len(cols_dezenas) >= 15:
+                    for i in range(15):
+                        nova_linha[cols_dezenas[i]] = dezenas[i]
+                
+                novos_dados.append(nova_linha)
+                concurso_a_buscar += 1 # Prepara para buscar o próximo
+            else:
+                # Se der erro 404, significa que não tem mais concursos novos. Chegamos no dia de hoje.
+                break
+                
+        # Se encontrou resultados novos, junta tudo e salva no disco
+        if novos_dados:
+            df_novos = pd.DataFrame(novos_dados)
+            df = pd.concat([df, df_novos], ignore_index=True)
+            
+            if filepath.endswith('.csv'):
+                df.to_csv(filepath, index=False)
+            else:
+                df.to_excel(filepath, index=False)
+            print("🚀 Planilha atualizada e salva no disco com os sorteios mais recentes!")
+            
+        return df
+    except Exception as e:
+        print(f"Erro durante a sincronização automática: {e}")
+        return df
+
 def carregar_dataframe_padrao():
-    """Tenta carregar o histórico salvo em disco automaticamente ao iniciar."""
+    """Carrega o histórico do disco e já tenta baixar as novidades da internet."""
     if os.path.exists(HISTORICO_PATH):
         try:
             if HISTORICO_PATH.endswith('.csv'):
-                return pd.read_csv(HISTORICO_PATH)
+                df = pd.read_csv(HISTORICO_PATH)
             else:
-                return pd.read_excel(HISTORICO_PATH)
-        except Exception:
-            pass
+                df = pd.read_excel(HISTORICO_PATH)
+                
+            # Chama a função mágica que atualiza a planilha usando a API da Caixa
+            df = sincronizar_com_caixa(df, HISTORICO_PATH)
+            return df
+        except Exception as e:
+            print(f"Erro ao carregar planilha padrão: {e}")
     return None
 
 def analisar_estatisticas(df):
@@ -51,7 +128,7 @@ def analisar_estatisticas(df):
         
         ultimo_sorteio = []
         if len(df) > 0:
-            # CORRIGIDO: Pega a ÚLTIMA linha do arquivo da Caixa (concurso mais recente da vida real)
+            # Pega a ÚLTIMA linha (concurso mais recente da vida real)
             row = df.iloc[-1]
             for c in cols_dezenas:
                 try:
@@ -75,7 +152,7 @@ def analisar_estatisticas(df):
         
         recente = set()
         if len(df) >= 15:
-            # CORRIGIDO: Pega os últimos 15 concursos de baixo para cima
+            # Pega os últimos 15 concursos de baixo para cima
             for _, row in df.tail(15).iterrows():
                 for c in cols_dezenas:
                     try:
@@ -136,6 +213,27 @@ def gerar_bilhetes_filtrados(count=5, model=None):
                 
     return bilhetes
 
+# EVENTO DE INICIALIZAÇÃO DO SERVIDOR
+@app.on_event("startup")
+async def startup_event():
+    """Roda automaticamente toda vez que você liga o servidor."""
+    print("Iniciando robô e verificando atualizações...")
+    df = carregar_dataframe_padrao()
+    
+    saved_model = None
+    if os.path.exists(MODELO_PATH):
+        try:
+            saved_model = joblib.load(MODELO_PATH)
+        except:
+            pass
+            
+    if df is not None:
+        sessions["default"] = {
+            "df": df,
+            "model": saved_model
+        }
+        print("✅ Base de dados e IA carregadas e atualizadas com sucesso!")
+
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
@@ -154,7 +252,6 @@ async def upload_file(file: UploadFile = File(...)):
             f.write(contents)
         
         session_id = "default"
-        
         saved_model = None
         if os.path.exists(MODELO_PATH):
             try:
@@ -182,7 +279,6 @@ async def upload_file(file: UploadFile = File(...)):
 async def generate_tickets(payload: GenerateRequest):
     trained_model = None
     
-    # Tenta buscar o modelo na sessão ou direto do disco salvo anteriormente
     if payload.session_id in sessions:
         trained_model = sessions[payload.session_id].get("model")
     
@@ -204,7 +300,6 @@ async def run_backtest(
 ):
     try:
         df = None
-        # Se o usuário mandou um arquivo novo no backtest, usamos e salvamos
         if file is not None:
             contents = await file.read()
             if file.filename.endswith('.csv'):
@@ -214,11 +309,14 @@ async def run_backtest(
             with open(HISTORICO_PATH, "wb") as f:
                 f.write(contents)
         else:
-            # Caso contrário, carrega o arquivo que já estava salvo no disco
-            df = carregar_dataframe_padrao()
+            df = None
+            if "default" in sessions:
+                df = sessions["default"]["df"]
+            if df is None:
+                df = carregar_dataframe_padrao()
             
         if df is None:
-            raise HTTPException(status_code=400, detail="Nenhum histórico encontrado. Faça o upload da planilha primeiro.")
+            raise HTTPException(status_code=400, detail="Nenhum histórico encontrado. Faça o upload da planilha pela primeira vez.")
         
         total_rows = len(df)
         if total_rows <= test_draws:
@@ -232,7 +330,6 @@ async def run_backtest(
         }
         
         historico_treino = []
-        
         cols_dezenas = [c for c in df.columns if 'bola' in str(c).lower() or 'dez' in str(c).lower() or 'num' in str(c).lower()]
         if not cols_dezenas and len(df.columns) >= 15:
             cols_dezenas = df.columns[1:16]
@@ -273,7 +370,7 @@ async def run_backtest(
                     trained_clf = RandomForestClassifier(n_estimators=10, random_state=42)
                     trained_clf.fit(X, y)
                     
-                    # Salva o modelo treinado de forma permanente no disco
+                    # Salva no disco permanentemente
                     joblib.dump(trained_clf, MODELO_PATH)
             except Exception:
                 pass
@@ -291,6 +388,15 @@ async def run_backtest(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro durante a execução do backtest: {str(e)}")
+
+# Rota extra só para forçar atualização pela internet (se quiser usar futuramente no botão do front-end)
+@app.get("/api/sincronizar")
+async def forcar_sincronizacao():
+    df = carregar_dataframe_padrao()
+    if df is not None:
+        stats = analisar_estatisticas(df)
+        return {"status": "success", "msg": "Planilha atualizada com os dados da Caixa!", "last_draw": stats["last_draw"]}
+    return {"status": "error", "msg": "Faça o upload do primeiro histórico antes de sincronizar."}
 
 if __name__ == "__main__":
     import uvicorn
