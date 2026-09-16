@@ -18,14 +18,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Caminhos padrão para persistência em disco
+HISTORICO_PATH = "historico_oficial.xlsx"
+MODELO_PATH = "modelo_ia.pkl"
+
 # Armazenamento em memória para as sessões ativas
 sessions = {}
 
 class GenerateRequest(BaseModel):
-    session_id: str
+    session_id: str = "default"
     count: int = 5
     total_numbers: int = 15
     range: int = 25
+
+def carregar_dataframe_padrao():
+    """Tenta carregar o histórico salvo em disco automaticamente ao iniciar."""
+    if os.path.exists(HISTORICO_PATH):
+        try:
+            if HISTORICO_PATH.endswith('.csv'):
+                return pd.read_csv(HISTORICO_PATH)
+            else:
+                return pd.read_excel(HISTORICO_PATH)
+        except Exception:
+            pass
+    return None
 
 def analisar_estatisticas(df):
     try:
@@ -98,7 +114,6 @@ def gerar_bilhetes_filtrados(count=5, model=None):
         
         # Filtros base restritivos
         if 6 <= qtd_impares <= 9 and 4 <= qtd_primos <= 7 and 160 <= soma_total <= 220:
-            # Se o modelo Random Forest foi treinado, usamos ele como filtro preditivo adicional
             if model is not None:
                 try:
                     features = [[soma_total, qtd_impares]]
@@ -110,7 +125,6 @@ def gerar_bilhetes_filtrados(count=5, model=None):
             else:
                 bilhetes.append(nums)
                 
-    # Fallback caso o modelo treinado seja restritivo demais nas primeiras tentativas
     if len(bilhetes) < count:
         while len(bilhetes) < count:
             nums = sorted(np.random.choice(range(1, 26), 15, replace=False).tolist())
@@ -126,18 +140,25 @@ def gerar_bilhetes_filtrados(count=5, model=None):
 async def upload_file(file: UploadFile = File(...)):
     try:
         contents = await file.read()
+        
+        # Salva o arquivo permanentemente no disco para nunca mais perder
+        global HISTORICO_PATH
         if file.filename.endswith('.csv'):
+            HISTORICO_PATH = "historico_oficial.csv"
             df = pd.read_csv(io.BytesIO(contents))
         else:
+            HISTORICO_PATH = "historico_oficial.xlsx"
             df = pd.read_excel(io.BytesIO(contents))
+            
+        with open(HISTORICO_PATH, "wb") as f:
+            f.write(contents)
         
-        session_id = str(np.random.randint(100000, 999999))
+        session_id = "default"
         
-        # Carrega modelo do disco se já existir
         saved_model = None
-        if os.path.exists("modelo_ia.pkl"):
+        if os.path.exists(MODELO_PATH):
             try:
-                saved_model = joblib.load("modelo_ia.pkl")
+                saved_model = joblib.load(MODELO_PATH)
             except:
                 pass
 
@@ -161,12 +182,13 @@ async def upload_file(file: UploadFile = File(...)):
 async def generate_tickets(payload: GenerateRequest):
     trained_model = None
     
+    # Tenta buscar o modelo na sessão ou direto do disco salvo anteriormente
     if payload.session_id in sessions:
         trained_model = sessions[payload.session_id].get("model")
     
-    if trained_model is None and os.path.exists("modelo_ia.pkl"):
+    if trained_model is None and os.path.exists(MODELO_PATH):
         try:
-            trained_model = joblib.load("modelo_ia.pkl")
+            trained_model = joblib.load(MODELO_PATH)
         except:
             pass
     
@@ -175,17 +197,28 @@ async def generate_tickets(payload: GenerateRequest):
 
 @app.post("/api/backtest")
 async def run_backtest(
-    file: UploadFile = File(...),
+    file: UploadFile = File(None),
     test_draws: int = Form(10),
     bets_per_draw: int = Form(12),
-    session_id: str = Form(None)
+    session_id: str = Form("default")
 ):
     try:
-        contents = await file.read()
-        if file.filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(contents))
+        df = None
+        # Se o usuário mandou um arquivo novo no backtest, usamos e salvamos
+        if file is not None:
+            contents = await file.read()
+            if file.filename.endswith('.csv'):
+                df = pd.read_csv(io.BytesIO(contents))
+            else:
+                df = pd.read_excel(io.BytesIO(contents))
+            with open(HISTORICO_PATH, "wb") as f:
+                f.write(contents)
         else:
-            df = pd.read_excel(io.BytesIO(contents))
+            # Caso contrário, carrega o arquivo que já estava salvo no disco
+            df = carregar_dataframe_padrao()
+            
+        if df is None:
+            raise HTTPException(status_code=400, detail="Nenhum histórico encontrado. Faça o upload da planilha primeiro.")
         
         total_rows = len(df)
         if total_rows <= test_draws:
@@ -240,14 +273,14 @@ async def run_backtest(
                     trained_clf = RandomForestClassifier(n_estimators=10, random_state=42)
                     trained_clf.fit(X, y)
                     
-                    # Salva no disco permanentemente
-                    joblib.dump(trained_clf, "modelo_ia.pkl")
+                    # Salva o modelo treinado de forma permanente no disco
+                    joblib.dump(trained_clf, MODELO_PATH)
             except Exception:
                 pass
 
-        if session_id and session_id in sessions:
+        if session_id in sessions:
             sessions[session_id]["model"] = trained_clf
-        elif session_id and session_id not in sessions:
+        else:
             sessions[session_id] = {"df": df, "model": trained_clf}
 
         return {
