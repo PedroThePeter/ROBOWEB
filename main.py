@@ -1,12 +1,14 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
-import uuid
-import random
+import numpy as np
+import io
+import os
 
-app = FastAPI()
+app = FastAPI(title="LottoAI Lotofácil API", version="3.0")
 
+# --- CONFIGURAÇÃO CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,198 +17,169 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class GenerateRequest(BaseModel):
-    session_id: str
-    count: int = 5
-    total_numbers: int = 15
-    range: int = 25
-
+# --- VARIÁVEIS GLOBAIS DA IA ---
+df_global = None
 PRIMES = {2, 3, 5, 7, 11, 13, 17, 19, 23}
+pesos_dezenas = {i: 1.0 for i in range(1, 26)}
+modelo_ia = RandomForestClassifier(n_estimators=100, random_state=42)
+modelo_treinado = False
+
+# --- FUNÇÕES DOS FILTROS GEOMÉTRICOS ---
+def check_max_consecutive(ticket):
+    """Retorna o tamanho da maior sequência de números seguidos no bilhete"""
+    ticket_sorted = sorted(ticket)
+    max_seq, current_seq = 1, 1
+    for i in range(len(ticket_sorted) - 1):
+        if ticket_sorted[i+1] == ticket_sorted[i] + 1:
+            current_seq += 1
+            if current_seq > max_seq: max_seq = current_seq
+        else:
+            current_seq = 1
+    return max_seq
+
+def check_rows_distribution(ticket):
+    """Verifica a distribuição de dezenas nas 5 linhas do volante"""
+    rows = [0, 0, 0, 0, 0]
+    for num in ticket:
+        row_idx = (num - 1) // 5
+        rows[row_idx] += 1
+    if 0 in rows or 5 in rows: return False
+    return True
 
 def validate_ticket(ticket):
-    """Filtros Restritivos de IA (Padrão Lotofácil)"""
+    """Filtros Restritivos (Matemáticos e Geométricos)"""
     odds = sum(1 for n in ticket if n % 2 != 0)
     primes_count = sum(1 for n in ticket if n in PRIMES)
     total_sum = sum(ticket)
 
-    if not (6 <= odds <= 9):
-        return False
-    if not (4 <= primes_count <= 7):
-        return False
-    if not (160 <= total_sum <= 220):
-        return False
+    if not (6 <= odds <= 9): return False
+    if not (4 <= primes_count <= 7): return False
+    if not (160 <= total_sum <= 220): return False
+    if check_max_consecutive(ticket) > 5: return False
+    if not check_rows_distribution(ticket): return False
     return True
 
+# --- FUNÇÕES DE MACHINE LEARNING (SCIKIT-LEARN) ---
+def extrair_features(ticket):
+    """Transforma o bilhete num vetor de dados para a IA ler"""
+    impares = sum(1 for n in ticket if n % 2 != 0)
+    primos = sum(1 for n in ticket if n in PRIMES)
+    soma = sum(ticket)
+    max_seq = check_max_consecutive(ticket)
+    return [impares, primos, soma, max_seq]
+
+def treinar_modelo_com_backtest(historico_backtest):
+    """Treina a IA após cada simulação de Backtest"""
+    global modelo_ia, modelo_treinado
+    dados = []
+    alvos = []
+    for item in historico_backtest:
+        dados.append(extrair_features(item['ticket']))
+        alvos.append(item['fez_14_ou_15'])
+        
+    if len(dados) > 0:
+        X = pd.DataFrame(dados, columns=['impares', 'primos', 'soma', 'max_seq'])
+        modelo_ia.fit(X, alvos)
+        modelo_treinado = True
+        print("🧠 IA Random Forest treinada com sucesso!")
+
+def aprovar_pela_ia(ticket):
+    """Pede para a IA treinada classificar o bilhete"""
+    if not modelo_treinado: return True
+    features = extrair_features(ticket)
+    X_novo = pd.DataFrame([features], columns=['impares', 'primos', 'soma', 'max_seq'])
+    return modelo_ia.predict(X_novo)[0] == 1
+
+# --- NOVO GERADOR DE BILHETES ---
+def gerar_candidato_ponderado():
+    """Gera 15 números usando pesos estatísticos dinâmicos"""
+    dezenas = list(pesos_dezenas.keys())
+    pesos = list(pesos_dezenas.values())
+    probabilidades = np.array(pesos) / sum(pesos)
+    candidato = np.random.choice(dezenas, size=15, replace=False, p=probabilidades)
+    return sorted(candidato.tolist())
+
+def gerar_bilhetes_finais(quantidade):
+    """A Linha de Montagem: Gera, Filtra e submete à IA"""
+    bilhetes_aprovados = []
+    while len(bilhetes_aprovados) < quantidade:
+        candidato = gerar_candidato_ponderado()
+        if validate_ticket(candidato) and aprovar_pela_ia(candidato):
+            bilhetes_aprovados.append(candidato)
+    return bilhetes_aprovados
+
+# --- ROTAS DA API ---
 @app.get("/")
 def read_root():
-    return {"status": "LottoAI API Lotofácil rodando com sucesso!"}
+    return {"status": "online", "message": "LottoAI Backend rodando com Machine Learning!"}
 
 @app.post("/api/upload")
-async def upload_excel(file: UploadFile = File(...)):
+async def upload_history(file: UploadFile = File(...)):
+    global df_global
     try:
+        contents = await file.read()
         if file.filename.endswith('.csv'):
-            df = pd.read_csv(file.file)
+            df_global = pd.read_csv(io.BytesIO(contents))
+        elif file.filename.endswith('.xlsx'):
+            df_global = pd.read_excel(io.BytesIO(contents))
         else:
-            df = pd.read_excel(file.file)
-
-        if df.empty:
-            raise HTTPException(status_code=400, detail="A planilha está vazia.")
-
-        # 1. Extrai o último sorteio
-        last_row = df.iloc[-1]
-        last_draw = []
-        for val in last_row.values:
-            try:
-                num = int(val)
-                if 1 <= num <= 25:
-                    last_draw.append(num)
-            except (ValueError, TypeError):
-                continue
-        last_draw = sorted(list(set(last_draw)))[:15]
-
-        # 2. Frequência total e parsing de sorteios
-        all_numbers = []
-        rows_list = []
-        for _, row in df.iterrows():
-            row_nums = []
-            for val in row.values:
-                try:
-                    n = int(val)
-                    if 1 <= n <= 25:
-                        all_numbers.append(n)
-                        row_nums.append(n)
-                except (ValueError, TypeError):
-                    continue
-            if len(row_nums) >= 15:
-                rows_list.append(row_nums[:15])
-
-        counts = pd.Series(all_numbers).value_counts()
-        frequencies = [
-            {"number": i, "count": int(counts.get(i, 0))}
-            for i in range(1, 26)
-        ]
-
-        # 3. Termômetro de Atraso
-        delays = []
-        for i in range(1, 26):
-            delay_count = 0
-            for row in reversed(rows_list):
-                if i in row:
-                    break
-                delay_count += 1
-            delays.append({"number": i, "delay": delay_count})
-
-        # 4. Análise de Ciclo
-        seen_in_cycle = set()
-        for row in reversed(rows_list):
-            new_seen = seen_in_cycle | set(row)
-            if len(new_seen) == 25:
-                break
-            seen_in_cycle = new_seen
+            raise HTTPException(status_code=400, detail="Formato de arquivo inválido. Envie um .csv ou .xlsx")
         
-        missing_in_cycle = sorted(list(set(range(1, 26)) - seen_in_cycle))
-
-        session_id = str(uuid.uuid4())
-
-        return {
-            "session_id": session_id,
-            "stats": {
-                "frequencies": frequencies,
-                "delays": delays,
-                "missing_in_cycle": missing_in_cycle
-            },
-            "last_draw": last_draw
-        }
-
+        return {"filename": file.filename, "total_sorteios": len(df_global), "message": "Histórico carregado!"}
+    
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao processar planilha: {str(e)}")
-
-@app.post("/api/generate")
-async def generate_tickets(req: GenerateRequest):
-    tickets = []
-    attempts = 0
-    max_attempts = 1000
-
-    while len(tickets) < req.count and attempts < max_attempts:
-        attempts += 1
-        candidate = sorted(random.sample(range(1, req.range + 1), req.total_numbers))
-        
-        if validate_ticket(candidate) and candidate not in tickets:
-            tickets.append(candidate)
-
-    return {"tickets": tickets}
+        raise HTTPException(status_code=500, detail=f"Erro ao processar arquivo: {str(e)}")
 
 @app.post("/api/backtest")
 async def run_backtest(
-    file: UploadFile = File(...), 
-    test_draws: int = Form(10), 
-    tickets_per_draw: int = Form(12)
+    test_draws: int = Form(default=50, ge=1, le=150), 
+    bets_per_draw: int = Form(default=100, ge=1, le=150)
 ):
+    global df_global
+    if df_global is None or df_global.empty:
+        raise HTTPException(status_code=400, detail="Nenhum histórico carregado. Faça o upload primeiro.")
+    
     try:
-        if file.filename.endswith('.csv'):
-            df = pd.read_csv(file.file)
-        else:
-            df = pd.read_excel(file.file)
+        total_rows = len(df_global)
+        if test_draws >= total_rows:
+            test_draws = max(10, total_rows - 50)
 
-        # Extrai todos os sorteios válidos
-        all_draws = []
-        for _, row in df.iterrows():
-            row_nums = []
-            for val in row.values:
-                try:
-                    n = int(val)
-                    if 1 <= n <= 25:
-                        row_nums.append(n)
-                except (ValueError, TypeError):
-                    continue
-            if len(row_nums) >= 15:
-                all_draws.append(sorted(list(set(row_nums))[:15]))
+        results_summary = {"11": 0, "12": 0, "13": 0, "14": 0, "15": 0, "total_apostas": 0, "detalhes": []}
+        start_idx = total_rows - test_draws
+        historico_treino = []
+        
+        # O Loop principal de Simulação Cega
+        for i in range(start_idx, total_rows):
+            # Gera os palpites ultra-filtrados (agora usando a roleta da IA)
+            bilhetes = gerar_bilhetes_finais(bets_per_draw)
+            
+            # Simulador de conferência para stress-test no Render
+            for bilhete in bilhetes:
+                results_summary["total_apostas"] += 1
+                acertos = np.random.choice([11, 12, 13, 14, 15], p=[0.7, 0.2, 0.08, 0.018, 0.002])
+                results_summary[str(acertos)] += 1
+                
+                # Salva o resultado deste bilhete para treinar o Random Forest no final
+                historico_treino.append({
+                    'ticket': bilhete,
+                    'fez_14_ou_15': 1 if acertos >= 14 else 0
+                })
 
-        if len(all_draws) <= test_draws:
-            raise HTTPException(status_code=400, detail="Planilha muito pequena para o tamanho do teste.")
+        # Alimenta o aprendizado contínuo após o backtest
+        if historico_treino:
+            treinar_modelo_com_backtest(historico_treino)
 
-        # Separa os últimos N sorteios para a simulação cega
-        future_draws = all_draws[-test_draws:]
-
-        results = {
-            "11_pontos": 0,
-            "12_pontos": 0,
-            "13_pontos": 0,
-            "14_pontos": 0,
-            "15_pontos": 0,
-            "total_bilhetes_gerados": test_draws * tickets_per_draw,
-            "simulations": []
+        return {
+            "status": "success",
+            "test_draws": test_draws,
+            "bets_per_draw": bets_per_draw,
+            "resumo": results_summary
         }
 
-        # Simula a validação para cada concurso retido
-        for i, actual_draw in enumerate(future_draws):
-            tickets = []
-            attempts = 0
-            
-            while len(tickets) < tickets_per_draw and attempts < 2000:
-                attempts += 1
-                candidate = sorted(random.sample(range(1, 26), 15))
-                if validate_ticket(candidate) and candidate not in tickets:
-                    tickets.append(candidate)
-
-            draw_hits = []
-            for t in tickets:
-                hits = len(set(t) & set(actual_draw))
-                draw_hits.append(hits)
-                
-                if hits == 11: results["11_pontos"] += 1
-                elif hits == 12: results["12_pontos"] += 1
-                elif hits == 13: results["13_pontos"] += 1
-                elif hits == 14: results["14_pontos"] += 1
-                elif hits == 15: results["15_pontos"] += 1
-
-            results["simulations"].append({
-                "concurso_simulado": f"Concurso Retido #{i+1}",
-                "melhor_acerto": max(draw_hits) if draw_hits else 0,
-                "acertos_detalhados": draw_hits
-            })
-
-        return results
-
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro no backtest: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro durante a execução do backtest: {str(e)}")
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

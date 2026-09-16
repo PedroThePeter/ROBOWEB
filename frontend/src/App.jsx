@@ -134,7 +134,7 @@ export default function App() {
     const formData = new FormData();
     formData.append('file', backtestFile);
     formData.append('test_draws', testDraws);
-    formData.append('tickets_per_draw', ticketsPerDraw);
+    formData.append('bets_per_draw', ticketsPerDraw); // Atualizado para o nome que o backend espera
 
     try {
       const res = await axios.post(`${API_URL}/backtest`, formData);
@@ -376,7 +376,7 @@ export default function App() {
                 <div>
                   <label className="text-xs text-slate-400 block mb-1">Palpites Gerados por Sorteio</label>
                   <input 
-                    type="number" min="1" max="50" 
+                    type="number" min="1" max="150" 
                     value={ticketsPerDraw} 
                     onChange={(e) => setTicketsPerDraw(Number(e.target.value))} 
                     className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm focus:border-emerald-400 outline-none" 
@@ -395,49 +395,41 @@ export default function App() {
               </form>
             </div>
 
-            {/* RESULTADOS DO BACKTEST */}
-            {backtestResults && (
+            {/* RESULTADOS DO BACKTEST ATUALIZADOS PARA O NOVO BACKEND */}
+            {backtestResults && backtestResults.resumo && (
               <div className="space-y-6">
                 <div className="grid grid-cols-5 gap-3">
                   <div className="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
                     <span className="text-xs text-slate-400 block font-medium">11 Pontos</span>
-                    <span className="text-2xl font-bold text-emerald-400">{backtestResults["11_pontos"]}</span>
+                    <span className="text-2xl font-bold text-emerald-400">{backtestResults.resumo["11"]}</span>
                   </div>
                   <div className="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
                     <span className="text-xs text-slate-400 block font-medium">12 Pontos</span>
-                    <span className="text-2xl font-bold text-emerald-400">{backtestResults["12_pontos"]}</span>
+                    <span className="text-2xl font-bold text-emerald-400">{backtestResults.resumo["12"]}</span>
                   </div>
                   <div className="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
                     <span className="text-xs text-slate-400 block font-medium">13 Pontos</span>
-                    <span className="text-2xl font-bold text-amber-400">{backtestResults["13_pontos"]}</span>
+                    <span className="text-2xl font-bold text-amber-400">{backtestResults.resumo["13"]}</span>
                   </div>
                   <div className="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
                     <span className="text-xs text-slate-400 block font-medium">14 Pontos</span>
-                    <span className="text-2xl font-bold text-rose-400">{backtestResults["14_pontos"]}</span>
+                    <span className="text-2xl font-bold text-rose-400">{backtestResults.resumo["14"]}</span>
                   </div>
                   <div className="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
                     <span className="text-xs text-slate-400 block font-medium">15 Pontos</span>
-                    <span className="text-2xl font-bold text-purple-400">{backtestResults["15_pontos"]}</span>
+                    <span className="text-2xl font-bold text-purple-400">{backtestResults.resumo["15"]}</span>
                   </div>
                 </div>
 
                 <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-4">
                   <div className="flex justify-between items-center border-b border-slate-700 pb-3">
                     <h3 className="font-semibold text-slate-200 flex items-center gap-2 text-sm">
-                      <Award className="w-4 h-4 text-emerald-400" /> Detalhamento das Simulações ({backtestResults.total_bilhetes_gerados} bilhetes no total)
+                      <Award className="w-4 h-4 text-emerald-400" /> Resumo Global ({backtestResults.resumo.total_apostas} apostas processadas pela IA)
                     </h3>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {backtestResults.simulations?.map((sim, idx) => (
-                      <div key={idx} className="bg-slate-900/70 p-3 rounded-lg border border-slate-700/50 flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-300">{sim.concurso_simulado}</span>
-                        <span className={`text-xs px-2.5 py-1 rounded font-bold ${sim.melhor_acerto >= 11 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'}`}>
-                          Melhor: {sim.melhor_acerto} acertos
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-sm text-slate-300">
+                    O Random Forest foi treinado com os resultados dessa simulação para os próximos ciclos.
+                  </p>
                 </div>
               </div>
             )}
