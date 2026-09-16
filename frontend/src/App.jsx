@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = "https://nome-do-seu-backend.onrender.com/api";
 
 export default function App() {
   // Estados principais
