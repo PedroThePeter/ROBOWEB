@@ -1,5 +1,6 @@
 import os
 import io
+import joblib
 import pandas as pd
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
@@ -17,7 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Armazenamento em memória para as sessões ativas (guarda o DataFrame e o Modelo de IA)
+# Armazenamento em memória para as sessões ativas
 sessions = {}
 
 class GenerateRequest(BaseModel):
@@ -34,7 +35,8 @@ def analisar_estatisticas(df):
         
         ultimo_sorteio = []
         if len(df) > 0:
-            row = df.iloc[0]
+            # CORRIGIDO: Pega a ÚLTIMA linha do arquivo da Caixa (concurso mais recente da vida real)
+            row = df.iloc[-1]
             for c in cols_dezenas:
                 try:
                     val = int(row[c])
@@ -57,7 +59,8 @@ def analisar_estatisticas(df):
         
         recente = set()
         if len(df) >= 15:
-            for _, row in df.head(15).iterrows():
+            # CORRIGIDO: Pega os últimos 15 concursos de baixo para cima
+            for _, row in df.tail(15).iterrows():
                 for c in cols_dezenas:
                     try:
                         val = int(row[c])
@@ -95,7 +98,7 @@ def gerar_bilhetes_filtrados(count=5, model=None):
         
         # Filtros base restritivos
         if 6 <= qtd_impares <= 9 and 4 <= qtd_primos <= 7 and 160 <= soma_total <= 220:
-            # Se o modelo Random Forest foi treinado via Backtest, usamos ele como filtro preditivo adicional
+            # Se o modelo Random Forest foi treinado, usamos ele como filtro preditivo adicional
             if model is not None:
                 try:
                     features = [[soma_total, qtd_impares]]
@@ -129,9 +132,18 @@ async def upload_file(file: UploadFile = File(...)):
             df = pd.read_excel(io.BytesIO(contents))
         
         session_id = str(np.random.randint(100000, 999999))
+        
+        # Carrega modelo do disco se já existir
+        saved_model = None
+        if os.path.exists("modelo_ia.pkl"):
+            try:
+                saved_model = joblib.load("modelo_ia.pkl")
+            except:
+                pass
+
         sessions[session_id] = {
             "df": df,
-            "model": None
+            "model": saved_model
         }
         
         stats = analisar_estatisticas(df)
@@ -147,11 +159,16 @@ async def upload_file(file: UploadFile = File(...)):
 
 @app.post("/api/generate")
 async def generate_tickets(payload: GenerateRequest):
-    if payload.session_id not in sessions:
-        raise HTTPException(status_code=404, detail="Sessão não encontrada. Faça o upload da planilha.")
+    trained_model = None
     
-    session_data = sessions[payload.session_id]
-    trained_model = session_data.get("model")
+    if payload.session_id in sessions:
+        trained_model = sessions[payload.session_id].get("model")
+    
+    if trained_model is None and os.path.exists("modelo_ia.pkl"):
+        try:
+            trained_model = joblib.load("modelo_ia.pkl")
+        except:
+            pass
     
     tickets = gerar_bilhetes_filtrados(payload.count, model=trained_model)
     return {"status": "success", "tickets": tickets}
@@ -222,10 +239,12 @@ async def run_backtest(
                 if len(set(y)) > 1:
                     trained_clf = RandomForestClassifier(n_estimators=10, random_state=42)
                     trained_clf.fit(X, y)
+                    
+                    # Salva no disco permanentemente
+                    joblib.dump(trained_clf, "modelo_ia.pkl")
             except Exception:
                 pass
 
-        # Salva o modelo treinado na sessão ativa (se houver session_id)
         if session_id and session_id in sessions:
             sessions[session_id]["model"] = trained_clf
         elif session_id and session_id not in sessions:
