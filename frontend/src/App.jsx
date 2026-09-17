@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 // URL do backend no Render (ou localhost se estiver testando local)
-const API_URL = 'https://roboweb-cvha.onrender.com/api';
+const API_URL = 'https://roboweb-cvha.onrender.com';
 
 export default function App() {
   const [status, setStatus] = useState(null);
