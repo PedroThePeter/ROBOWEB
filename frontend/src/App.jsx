@@ -1,267 +1,392 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 
-const API_URL = 'https://roboweb-cvha.onrender.com/api';
+// URL do backend no Render (ou localhost se estiver testando local)
+const API_URL = 'https://roboweb-cvha.onrender.com/apiimport';
 
 export default function App() {
-  const [file, setFile] = useState(null);
-  const [session, setSession] = useState(null);
-  const [stats, setStats] = useState(null);
-  const [lastDraw, setLastDraw] = useState([]);
-  const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState(null);
+  const [loadingStatus, setLoadingStatus] = useState(true);
+  
+  // Estado das Abas
+  const [activeTab, setActiveTab] = useState('generator'); // 'generator' | 'ranking' | 'backtest'
+  
+  // Gerador
   const [count, setCount] = useState(5);
-
-  // Estados do Backtest
+  const [generating, setGenerating] = useState(false);
+  const [tickets, setTickets] = useState([]);
+  const [ranking, setRanking] = useState([]);
+  
+  // Backtest
   const [testDraws, setTestDraws] = useState(10);
-  const [ticketsPerDraw, setTicketsPerDraw] = useState(12);
-  const [backtestResults, setBacktestResults] = useState(null);
-  const [backtestLoading, setBacktestLoading] = useState(false);
+  const [betsPerDraw, setBetsPerDraw] = useState(12);
+  const [backtesting, setBacktesting] = useState(false);
+  const [backtestResult, setBacktestResult] = useState(null);
 
-  // 🔄 CARREGAMENTO AUTOMÁTICO AO ABRIR / APERTAR F5
+  // Copiar bilhete
+  const [copiedIndex, setCopiedIndex] = useState(null);
+
+  // Upload de arquivo
+  const [uploading, setUploading] = useState(false);
+
   useEffect(() => {
-    const fetchAutoStatus = async () => {
-      try {
-        setLoading(true);
-        // Busca os dados da planilha oficial que está salva na nuvem
-        const res = await axios.get(`${API_URL}/status`);
-        if (res.data && res.data.session_id) {
-          setSession(res.data.session_id);
-          setStats(res.data.stats);
-          setLastDraw(res.data.last_draw || []);
-        }
-      } catch (err) {
-        console.log('Aguardando envio manual ou inicialização do servidor...');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAutoStatus();
+    fetchStatus();
   }, []);
 
-  // Upload da planilha principal (Opcional, para caso queira trocar de planilha)
-  const handleFileUpload = async (e) => {
-    const uploadedFile = e.target.files[0];
-    if (!uploadedFile) return;
-    setFile(uploadedFile);
-
-    const formData = new FormData();
-    formData.append('file', uploadedFile);
-
-    setLoading(true);
+  const fetchStatus = async () => {
+    setLoadingStatus(true);
     try {
-      const res = await axios.post(`${API_URL}/upload`, formData);
-      setSession(res.data.session_id);
-      setStats(res.data.stats);
-      setLastDraw(res.data.last_draw || []);
+      const res = await fetch(`${API_URL}/api/status`);
+      const data = await res.json();
+      setStatus(data);
     } catch (err) {
-      alert(err.response?.data?.detail || 'Erro ao enviar o arquivo.');
+      console.error('Erro ao buscar status:', err);
     } finally {
-      setLoading(false);
+      setLoadingStatus(false);
     }
   };
 
-  // Gerar Palpites
-  const handleGenerate = async (e) => {
-    e.preventDefault();
-    if (!session) {
-      alert('Aguarde a conexão com o banco de dados.');
-      return;
-    }
-
-    setLoading(true);
+  const handleGenerate = async () => {
+    setGenerating(true);
     try {
-      const res = await axios.post(`${API_URL}/generate`, {
-        session_id: session,
-        count: parseInt(count),
-        total_numbers: 15,
-        range: 25
+      const res = await fetch(`${API_URL}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count: parseInt(count) })
       });
-      setTickets(res.data.tickets);
+      const data = await res.json();
+      setTickets(data.tickets || []);
+      setRanking(data.ranking || []);
     } catch (err) {
-      alert(err.response?.data?.detail || 'Erro ao gerar palpites.');
+      alert('Erro ao gerar bilhetes. Verifique o servidor.');
     } finally {
-      setLoading(false);
+      setGenerating(false);
     }
   };
 
-  // Executar Backtest
-  const handleRunBacktest = async (e) => {
-    e.preventDefault();
-    if (!session && !file) {
-      alert('Aguarde a conexão com o histórico.');
-      return;
-    }
+  const handleBacktest = async () => {
+    setBacktesting(true);
+    setBacktestResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('test_draws', testDraws);
+      formData.append('bets_per_draw', betsPerDraw);
 
-    setBacktestLoading(true);
+      const res = await fetch(`${API_URL}/api/backtest`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      setBacktestResult(data.resumo);
+    } catch (err) {
+      alert('Erro ao executar o Backtest.');
+    } finally {
+      setBacktesting(false);
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
     const formData = new FormData();
-    if (file) formData.append('file', file);
-    formData.append('test_draws', testDraws);
-    formData.append('bets_per_draw', ticketsPerDraw);
-    if (session) formData.append('session_id', session);
+    formData.append('file', file);
 
     try {
-      const res = await axios.post(`${API_URL}/backtest`, formData);
-      setBacktestResults(res.data);
+      const res = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      if (res.ok) {
+        alert('Planilha enviada com sucesso!');
+        fetchStatus();
+      } else {
+        alert('Erro ao processar planilha.');
+      }
     } catch (err) {
-      alert(err.response?.data?.detail || 'Erro ao executar o Backtest.');
+      alert('Erro ao enviar o arquivo.');
     } finally {
-      setBacktestLoading(false);
+      setUploading(false);
     }
   };
+
+  const copyTicketToClipboard = (ticket, index) => {
+    const text = ticket.map(n => String(n).padStart(2, '0')).join(', ');
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const isPrime = (num) => [2, 3, 5, 7, 11, 13, 17, 19, 23].includes(num);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 md:p-8">
+      <div className="max-w-6xl mx-auto space-y-6">
         
-        {/* Topo / Header Simples */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl gap-4">
+        {/* HEADER / BANNER */}
+        <header className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-xl font-bold text-emerald-400">🎯 Robô Lotofácil Inteligente</h1>
-            <p className="text-xs text-slate-400 mt-0.5">Geração de bilhetes baseada em estatísticas e Machine Learning</p>
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">🤖</span>
+              <h1 className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
+                Robô Lotofácil IA
+              </h1>
+            </div>
+            <p className="text-slate-400 text-sm mt-1">
+              Análise Preditiva com Random Forest & Filtros de Alta Probabilidade
+            </p>
           </div>
-          <div>
-            <label className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer shadow-lg transition">
-              <span>{file ? '📁 Planilha Personalizada' : '📁 Alterar Planilha Base'}</span>
-              <input type="file" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} className="hidden" />
+
+          <div className="flex items-center gap-3">
+            <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl text-sm font-medium border border-slate-700 transition-all flex items-center gap-2">
+              <span>{uploading ? '⏳ Enviando...' : '📁 Atualizar Planilha'}</span>
+              <input type="file" accept=".xlsx,.csv" onChange={handleFileUpload} className="hidden" />
             </label>
-            {session && <span className="block text-[10px] text-emerald-400 mt-1 text-center">✓ Conectado e Atualizado (Caixa)</span>}
+            <button onClick={fetchStatus} className="bg-slate-800 hover:bg-slate-700 p-2 rounded-xl border border-slate-700 text-slate-300">
+              🔄
+            </button>
           </div>
         </header>
 
-        {/* Grade Principal: Gerador e Resultados */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Coluna Esquerda: Controles de Geração */}
-          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-5">
-            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Configurar Jogos</h2>
-            
-            <form onSubmit={handleGenerate} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Quantidade de Jogos</label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  max="50" 
-                  value={count} 
+        {/* PAINEL DE STATUS DO ÚLTIMO CONCURSO */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+              <span>🎯</span> Último Sorteio Oficial
+              {status?.stats?.ultimo_concurso && (
+                <span className="bg-emerald-500/10 text-emerald-400 text-xs font-semibold px-2.5 py-1 rounded-full border border-emerald-500/20">
+                  Concurso #{status.stats.ultimo_concurso}
+                </span>
+              )}
+            </h2>
+            <span className="text-xs text-slate-400">
+              Total na Base: <strong>{status?.stats?.total_concursos || 0}</strong> jogos
+            </span>
+          </div>
+
+          {loadingStatus ? (
+            <div className="text-center py-4 text-slate-400 animate-pulse">Sincronizando com a Caixa...</div>
+          ) : status?.last_draw?.length > 0 ? (
+            <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+              {status.last_draw.map((num) => (
+                <span
+                  key={num}
+                  className="w-10 h-10 flex items-center justify-center font-bold text-lg rounded-full bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                >
+                  {String(num).padStart(2, '0')}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="text-slate-400 text-sm">Nenhum concurso carregado na base ainda.</div>
+          )}
+        </div>
+
+        {/* NAVEGAÇÃO DE ABAS */}
+        <div className="flex bg-slate-900 p-1.5 rounded-xl border border-slate-800 max-w-md mx-auto">
+          <button
+            onClick={() => setActiveTab('generator')}
+            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'generator' ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            🤖 Gerar Palpites
+          </button>
+          <button
+            onClick={() => setActiveTab('ranking')}
+            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'ranking' ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            🔥 Ranking IA
+          </button>
+          <button
+            onClick={() => setActiveTab('backtest')}
+            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'backtest' ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            📊 Simulação
+          </button>
+        </div>
+
+        {/* CONTEÚDO DA ABA 1: GERADOR DE PALPITES */}
+        {activeTab === 'generator' && (
+          <div className="space-y-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4 w-full md:w-auto">
+                <label className="text-sm font-medium text-slate-300 whitespace-nowrap">Qtd. de Jogos:</label>
+                <select
+                  value={count}
                   onChange={(e) => setCount(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
-                />
+                  className="bg-slate-800 border border-slate-700 text-slate-100 px-4 py-2 rounded-xl focus:outline-none focus:border-emerald-500 w-full md:w-auto"
+                >
+                  <option value={1}>1 Bilhete</option>
+                  <option value={5}>5 Bilhetes</option>
+                  <option value={10}>10 Bilhetes</option>
+                  <option value={20}>20 Bilhetes</option>
+                </select>
               </div>
 
-              <button 
-                type="submit" 
-                disabled={loading || !session}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-800 disabled:text-slate-600 text-white font-semibold py-3 rounded-xl transition shadow-lg text-sm"
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                className="w-full md:w-auto bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
               >
-                {loading ? 'Processando...' : 'Gerar Palpites 🤖'}
+                {generating ? '🧠 Calculando no Random Forest...' : '✨ Gerar Jogos Inteligentes'}
               </button>
-            </form>
+            </div>
 
-            {lastDraw.length > 0 && (
-              <div className="pt-4 border-t border-slate-800">
-                <span className="text-[11px] text-slate-400 block mb-2 uppercase tracking-wider">Último Concurso Analisado</span>
-                <div className="flex flex-wrap gap-1">
-                  {lastDraw.map((num, idx) => (
-                    <span key={idx} className="w-7 h-7 rounded-lg bg-slate-950 border border-slate-800 text-emerald-400 font-bold text-xs flex items-center justify-center">
-                      {String(num).padStart(2, '0')}
-                    </span>
-                  ))}
-                </div>
+            {/* LISTA DE JOGOS GERADOS */}
+            {tickets.length > 0 && (
+              <div className="grid grid-cols-1 gap-4">
+                {tickets.map((ticket, idx) => {
+                  const soma = ticket.reduce((a, b) => a + b, 0);
+                  const pares = ticket.filter((n) => n % 2 === 0).length;
+                  const primos = ticket.filter(isPrime).length;
+
+                  return (
+                    <div key={idx} className="bg-slate-900 border border-slate-800 hover:border-slate-700 transition-all rounded-2xl p-5 space-y-4">
+                      <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                        <span className="font-bold text-emerald-400 text-sm">Bilhete #{idx + 1}</span>
+                        
+                        <div className="flex gap-3 text-xs text-slate-400">
+                          <span>Soma: <strong className="text-slate-200">{soma}</strong></span>
+                          <span>Pares: <strong className="text-slate-200">{pares}</strong></span>
+                          <span>Primos: <strong className="text-slate-200">{primos}</strong></span>
+                        </div>
+
+                        <button
+                          onClick={() => copyTicketToClipboard(ticket, idx)}
+                          className="bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition-all"
+                        >
+                          {copiedIndex === idx ? '✅ Copiado!' : '📋 Copiar'}
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {ticket.map((num) => (
+                          <span
+                            key={num}
+                            className="w-9 h-9 flex items-center justify-center font-bold text-sm rounded-xl bg-slate-800 text-cyan-300 border border-slate-700"
+                          >
+                            {String(num).padStart(2, '0')}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
+        )}
 
-          {/* Coluna Direita: Bilhetes Gerados */}
-          <div className="lg:col-span-2 bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
-            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Bilhetes Recomendados</h2>
-            
-            {tickets.length === 0 ? (
-              <div className="h-48 flex items-center justify-center text-slate-600 text-xs border border-dashed border-slate-800 rounded-xl">
-                Nenhum bilhete gerado. Clique em "Gerar Palpites 🤖".
+        {/* CONTEÚDO DA ABA 2: RANKING IA DE PROBABILIDADES */}
+        {activeTab === 'ranking' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+            <h3 className="text-lg font-bold text-slate-200 mb-2">🔥 Ranking de Probabilidades (Random Forest)</h3>
+            <p className="text-sm text-slate-400 mb-6">
+              Esta é a chance estimada pelo modelo para a saída de cada dezena no próximo concurso com base em janelas de frequência e atrito de atraso.
+            </p>
+
+            {ranking.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                Clique em <strong>"Gerar Palpites"</strong> para calcular o ranking mais recente.
               </div>
             ) : (
-              <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
-                {tickets.map((ticket, i) => (
-                  <div key={i} className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800/60">
-                    <span className="text-xs font-semibold text-slate-500">#{i + 1}</span>
-                    <div className="flex flex-wrap gap-1 justify-end">
-                      {ticket.map((n, idx) => (
-                        <span key={idx} className="w-7 h-7 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center">
-                          {String(n).padStart(2, '0')}
-                        </span>
-                      ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {ranking.map((item) => (
+                  <div key={item.dezena} className="bg-slate-800/50 p-3 rounded-xl border border-slate-800 flex items-center gap-4">
+                    <span className="w-9 h-9 flex items-center justify-center font-extrabold text-slate-950 rounded-xl bg-cyan-400">
+                      {String(item.dezena).padStart(2, '0')}
+                    </span>
+                    
+                    <div className="flex-1 space-y-1">
+                      <div className="flex justify-between text-xs font-semibold">
+                        <span className="text-slate-300">Dezena {item.dezena}</span>
+                        <span className="text-emerald-400">{item.probabilidade}%</span>
+                      </div>
+                      
+                      <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-emerald-500 to-cyan-400 h-full transition-all duration-500"
+                          style={{ width: `${item.probabilidade}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-        </div>
+        )}
 
-        {/* Seção Inferior Compacta: Backtest & Treino de IA */}
-        <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-            <div>
-              <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Simulação de Backtest & IA</h2>
-              <p className="text-xs text-slate-500">Treina o Random Forest usando concursos passados para filtrar os palpites.</p>
-            </div>
-            
-            <form onSubmit={handleRunBacktest} className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">Testes:</span>
-                <input 
-                  type="number" 
-                  value={testDraws} 
-                  onChange={(e) => setTestDraws(e.target.value)}
-                  className="w-20 bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-white text-center focus:outline-none focus:border-emerald-500"
-                />
+        {/* CONTEÚDO DA ABA 3: SIMULAÇÃO E BACKTEST */}
+        {activeTab === 'backtest' && (
+          <div className="space-y-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+              <h3 className="text-lg font-bold text-slate-200">📊 Teste Histórico Cruzado (Backtest Real)</h3>
+              <p className="text-sm text-slate-400">
+                Simule como o algoritmo teria se comportado nos concursos passados sem vazar informações do futuro.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Qtd. de Concursos Passados para Testar:</label>
+                  <input
+                    type="number"
+                    value={testDraws}
+                    onChange={(e) => setTestDraws(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 text-slate-100 px-4 py-2 rounded-xl focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Apostas por Concurso:</label>
+                  <input
+                    type="number"
+                    value={betsPerDraw}
+                    onChange={(e) => setBetsPerDraw(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 text-slate-100 px-4 py-2 rounded-xl focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">Apostas/Concurso:</span>
-                <input 
-                  type="number" 
-                  value={ticketsPerDraw} 
-                  onChange={(e) => setTicketsPerDraw(e.target.value)}
-                  className="w-20 bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-white text-center focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-              <button 
-                type="submit" 
-                disabled={backtestLoading || !session}
-                className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-emerald-400 border border-emerald-500/30 font-semibold text-xs py-2 px-4 rounded-lg transition"
+
+              <button
+                onClick={handleBacktest}
+                disabled={backtesting}
+                className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-400 font-bold py-3 rounded-xl transition-all disabled:opacity-50"
               >
-                {backtestLoading ? 'Treinando...' : 'Rodar Backtest 🚀'}
+                {backtesting ? '⏳ Rodando Cruzamento Real...' : '🚀 Executar Simulação'}
               </button>
-            </form>
-          </div>
-
-          {backtestResults && (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-3 border-t border-slate-800 text-center">
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-                <span className="block text-[10px] text-slate-500 uppercase">Total Apostas</span>
-                <span className="text-sm font-bold text-white">{backtestResults.resumo.total_apostas}</span>
-              </div>
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-                <span className="block text-[10px] text-slate-500 uppercase">11 Pts</span>
-                <span className="text-sm font-bold text-slate-300">{backtestResults.resumo["11"]}</span>
-              </div>
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-                <span className="block text-[10px] text-slate-500 uppercase">12 Pts</span>
-                <span className="text-sm font-bold text-slate-300">{backtestResults.resumo["12"]}</span>
-              </div>
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-                <span className="block text-[10px] text-slate-500 uppercase">13 / 14 Pts</span>
-                <span className="text-sm font-bold text-emerald-400">{backtestResults.resumo["13"]} / {backtestResults.resumo["14"]}</span>
-              </div>
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-                <span className="block text-[10px] text-slate-500 uppercase">15 Pts</span>
-                <span className="text-sm font-bold text-yellow-400">{backtestResults.resumo["15"]}</span>
-              </div>
             </div>
-          )}
-        </div>
+
+            {/* RESULTADO DO BACKTEST */}
+            {backtestResult && (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                  <h4 className="font-bold text-slate-200">Resultado do Teste</h4>
+                  <span className="text-xs text-slate-400">
+                    Total de Bilhetes Conferidos: <strong>{backtestResult.total_apostas}</strong>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  {[11, 12, 13, 14, 15].map((pts) => (
+                    <div key={pts} className="bg-slate-800/40 border border-slate-800 p-4 rounded-xl text-center space-y-1">
+                      <span className="text-xs text-slate-400 block">{pts} Pontos</span>
+                      <span className="text-2xl font-black text-emerald-400">
+                        {backtestResult[String(pts)] || 0}
+                      </span>
+                      <span className="text-[10px] text-slate-500 block">bilhetes premiados</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
     </div>
