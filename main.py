@@ -42,7 +42,6 @@ def extrair_dezenas_linha(row) -> List[int]:
                 numeros.append(num)
         except (ValueError, TypeError):
             continue
-    # Pega exatamente as 15 dezenas do sorteio
     return sorted(numeros[-15:]) if len(numeros) >= 15 else sorted(numeros)
 
 
@@ -52,7 +51,6 @@ def carregar_e_sincronizar_base():
     
     print("Iniciando robô e verificando atualizações...")
     
-    # 1. Procura se existe a planilha oficial na pasta
     if not os.path.exists(FILE_NAME_OFFICIAL):
         arquivos = glob.glob("*.xlsx") + glob.glob("*.csv")
         if arquivos:
@@ -71,11 +69,9 @@ def carregar_e_sincronizar_base():
 
         dataframe_global = df
         
-        # Pega a última linha para saber o último sorteio
         ultima_linha = df.iloc[-1].values
         ultimo_concurso_global = extrair_dezenas_linha(ultima_linha)
         
-        # Tenta identificar o número do último concurso
         if "Concurso" in df.columns:
             ultimo_numero_concurso = int(df["Concurso"].dropna().iloc[-1])
         else:
@@ -83,7 +79,6 @@ def carregar_e_sincronizar_base():
 
         print(f"📊 Base carregada! Último concurso registrado: #{ultimo_numero_concurso}")
 
-        # 2. Tenta buscar atualizações na Caixa automaticamente
         sincronizar_com_caixa()
 
     except Exception as e:
@@ -97,7 +92,6 @@ def sincronizar_com_caixa():
     if ultimo_numero_concurso <= 0:
         return
 
-    # 🛡️ Cabeçalhos avançados de camuflagem (Bypass de Bloqueio da Caixa)
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Accept": "application/json",
@@ -113,7 +107,6 @@ def sincronizar_com_caixa():
     while True:
         url = f"https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil/{proximo_concurso}"
         try:
-            # Timeout de 10s para conexões lentas da Caixa
             res = requests.get(url, headers=headers, verify=False, timeout=10)
             
             if res.status_code == 200:
@@ -150,7 +143,6 @@ def sincronizar_com_caixa():
             print(f"❌ Erro na conexão: {e}")
             break
 
-    # Se encontrou novos concursos, salva no DataFrame e na planilha
     if novos_sorteios and dataframe_global is not None:
         try:
             novas_linhas = []
@@ -186,14 +178,14 @@ class GenerateRequest(BaseModel):
     range: int = 25
 
 
-def gerar_jogos_inteligentes(count: int = 5) -> List[List[int]]:
-    """ Algoritmo de geração de palpites baseado nas frequências da base """
-    if dataframe_global is None or len(dataframe_global) == 0:
+def gerar_jogos_com_base(df_sub: pd.DataFrame, count: int = 12) -> List[List[int]]:
+    """ Gera palpites com base em uma fatia histórica específica do DataFrame """
+    if df_sub is None or len(df_sub) == 0:
         return [sorted(np.random.choice(range(1, 26), 15, replace=False).tolist()) for _ in range(count)]
 
     todas_dezenas = []
-    for idx in range(len(dataframe_global)):
-        todas_dezenas.extend(extrair_dezenas_linha(dataframe_global.iloc[idx].values))
+    for idx in range(len(df_sub)):
+        todas_dezenas.extend(extrair_dezenas_linha(df_sub.iloc[idx].values))
     
     counts = pd.Series(todas_dezenas).value_counts()
     
@@ -211,7 +203,11 @@ def gerar_jogos_inteligentes(count: int = 5) -> List[List[int]]:
     return jogos
 
 
-# 🔄 ROTA CHAMADA AUTOMATICAMENTE PELO REACT NO F5 / ABRIR SITE
+def gerar_jogos_inteligentes(count: int = 5) -> List[List[int]]:
+    """ Algoritmo de geração de palpites baseado em toda a base atual """
+    return gerar_jogos_com_base(dataframe_global, count=count)
+
+
 @app.get("/api/status")
 def get_status():
     global dataframe_global, ultimo_concurso_global, session_id_global
@@ -229,7 +225,6 @@ def get_status():
     }
 
 
-# ROTA DE UPLOAD (Opcional, para trocar a planilha manualmente)
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
     global dataframe_global, ultimo_concurso_global, ultimo_numero_concurso
@@ -243,7 +238,6 @@ async def upload_file(file: UploadFile = File(...)):
 
         dataframe_global = df
         
-        # Salva a nova planilha sobre gravando a oficial
         if file.filename.endswith(".csv"):
             df.to_csv(FILE_NAME_OFFICIAL, index=False)
         else:
@@ -262,14 +256,13 @@ async def upload_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=f"Erro ao processar arquivo: {str(e)}")
 
 
-# ROTA PARA GERAR PALPITES
 @app.post("/api/generate")
 def generate_tickets(req: GenerateRequest):
     jogos = gerar_jogos_inteligentes(count=req.count)
     return {"tickets": jogos}
 
 
-# ROTA PARA BACKTEST E SIMULAÇÕES
+# 🚀 ROTA DE BACKTEST REAL (CRUZAMENTO JOGO A JOGO CONTRA O HISTÓRICO)
 @app.post("/api/backtest")
 async def run_backtest(
     file: Optional[UploadFile] = File(None),
@@ -279,18 +272,58 @@ async def run_backtest(
 ):
     global dataframe_global
     
-    if dataframe_global is None and file is None:
-        raise HTTPException(status_code=400, detail="Nenhuma base de dados disponível para Backtest.")
+    df = dataframe_global
+    if file is not None:
+        try:
+            contents = await file.read()
+            if file.filename.endswith(".csv"):
+                df = pd.read_csv(io.BytesIO(contents))
+            else:
+                df = pd.read_excel(io.BytesIO(contents))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Erro ao processar planilha de backtest: {str(e)}")
 
-    total_apostas = test_draws * bets_per_draw
+    if df is None or len(df) < 2:
+        raise HTTPException(status_code=400, detail="Base de dados insuficiente para executar o Backtest.")
+
+    total_concursos = len(df)
+    qtd_testes = min(test_draws, total_concursos - 1)
     
+    placar = {"11": 0, "12": 0, "13": 0, "14": 0, "15": 0}
+    total_apostas = 0
+
+    # Determina o índice de início para testar os últimos N concursos
+    inicio_idx = total_concursos - qtd_testes
+
+    for i in range(inicio_idx, total_concursos):
+        # Pega somente o histórico PASSADO (até o concurso i-1) para evitar que o robô 'veja o futuro'
+        df_historico_passado = df.iloc[:i]
+        
+        # Concurso real sorteado que servirá de gabarito para a conferência
+        resultado_real = set(extrair_dezenas_linha(df.iloc[i].values))
+
+        if len(resultado_real) < 15:
+            continue
+
+        # Geramos os palpites usando puramente os dados passados
+        bilhetes_gerados = gerar_jogos_com_base(df_historico_passado, count=bets_per_draw)
+        total_apostas += len(bilhetes_gerados)
+
+        # Cruzamento real: confere acerto por acerto contra o sorteio oficial
+        for bilhete in bilhetes_gerados:
+            acertos = len(set(bilhete).intersection(resultado_real))
+            if acertos >= 11:
+                chave = str(acertos)
+                if chave in placar:
+                    placar[chave] += 1
+
     resumo = {
         "total_apostas": total_apostas,
-        "11": int(total_apostas * 0.088),
-        "12": int(total_apostas * 0.016),
-        "13": int(total_apostas * 0.0014),
-        "14": int(total_apostas * 0.00004),
-        "15": 0
+        "11": placar["11"],
+        "12": placar["12"],
+        "13": placar["13"],
+        "14": placar["14"],
+        "15": placar["15"]
     }
 
     return {"resumo": resumo}
