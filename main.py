@@ -91,42 +91,63 @@ def carregar_e_sincronizar_base():
 
 
 def sincronizar_com_caixa():
-    """ Consulta a API pública da Caixa para adicionar novos sorteios automaticamente """
+    """ Consulta a API pública da Caixa fingindo ser um navegador para evitar bloqueios """
     global dataframe_global, ultimo_concurso_global, ultimo_numero_concurso
     
     if ultimo_numero_concurso <= 0:
         return
 
+    # 🛡️ Cabeçalhos avançados de camuflagem (Bypass de Bloqueio da Caixa)
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "application/json",
+        "Referer": "https://loterias.caixa.gov.br/",
+        "Connection": "keep-alive"
     }
 
     proximo_concurso = ultimo_numero_concurso + 1
     novos_sorteios = []
 
-    print(f"Verificando se existem novos sorteios após o concurso {ultimo_numero_concurso}...")
+    print(f"🔎 Buscando o concurso {proximo_concurso} na internet...")
 
     while True:
         url = f"https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil/{proximo_concurso}"
         try:
-            res = requests.get(url, headers=headers, verify=False, timeout=5)
+            # Timeout de 10s para conexões lentas da Caixa
+            res = requests.get(url, headers=headers, verify=False, timeout=10)
+            
             if res.status_code == 200:
                 data = res.json()
-                if "dezenasSorteadasOrdemSorteio" in data or "listaDezenas" in data:
-                    dezenas = [int(n) for n in data.get("listaDezenas", [])]
-                    if len(dezenas) == 15:
-                        dezenas.sort()
-                        novos_sorteios.append({
-                            "Concurso": proximo_concurso,
-                            "Dezenas": dezenas
-                        })
-                        ultimo_concurso_global = dezenas
-                        ultimo_numero_concurso = proximo_concurso
-                        print(f"✅ Novo concurso {proximo_concurso} encontrado na internet! Dezenas: {dezenas}")
-                        proximo_concurso += 1
-                        continue
+                lista = data.get("listaDezenas", []) or data.get("dezenasSorteadasOrdemSorteio", [])
+                
+                dezenas = [int(n) for n in lista]
+                if len(dezenas) == 15:
+                    dezenas.sort()
+                    novos_sorteios.append({
+                        "Concurso": proximo_concurso,
+                        "Dezenas": dezenas
+                    })
+                    ultimo_concurso_global = dezenas
+                    ultimo_numero_concurso = proximo_concurso
+                    print(f"✅ Sucesso! Concurso {proximo_concurso} baixado: {dezenas}")
+                    proximo_concurso += 1
+                    continue
+                    
+            elif res.status_code == 404:
+                print(f"👍 Tudo atualizado! O concurso {proximo_concurso} ainda não foi sorteado (404).")
+                break
+            elif res.status_code == 403:
+                print(f"🛑 BLOQUEIO CAIXA (403): O IP do Render foi bloqueado ao tentar buscar o concurso {proximo_concurso}.")
+                break
+            else:
+                print(f"⚠️ Falha inesperada. Código da Caixa: {res.status_code}")
+                break
+                
+        except requests.exceptions.Timeout:
+            print(f"⏳ Tempo esgotado ao conectar com a Caixa no concurso {proximo_concurso}.")
             break
-        except Exception:
+        except Exception as e:
+            print(f"❌ Erro na conexão: {e}")
             break
 
     # Se encontrou novos concursos, salva no DataFrame e na planilha
@@ -142,13 +163,16 @@ def sincronizar_com_caixa():
             df_novos = pd.DataFrame(novas_linhas)
             dataframe_global = pd.concat([dataframe_global, df_novos], ignore_index=True)
             
-            # Salva atualizado na planilha oficial no disco
-            dataframe_global.to_excel(FILE_NAME_OFFICIAL, index=False)
-            print("🚀 Planilha oficial atualizada e salva com sucesso!")
+            if FILE_NAME_OFFICIAL.endswith(".csv"):
+                dataframe_global.to_csv(FILE_NAME_OFFICIAL, index=False)
+            else:
+                dataframe_global.to_excel(FILE_NAME_OFFICIAL, index=False)
+                
+            print(f"🚀 Banco de dados atualizado! +{len(novos_sorteios)} sorteio(s) adicionado(s) à planilha.")
         except Exception as e:
             print(f"⚠️ Erro ao salvar atualização no arquivo: {e}")
 
-    print("✅ Base de dados e IA carregadas e atualizadas com sucesso!")
+    print("✅ Processo de sincronização finalizado!")
 
 
 # Carrega e sincroniza a base assim que o servidor liga
@@ -218,7 +242,12 @@ async def upload_file(file: UploadFile = File(...)):
             df = pd.read_excel(io.BytesIO(contents))
 
         dataframe_global = df
-        df.to_excel(FILE_NAME_OFFICIAL, index=False)
+        
+        # Salva a nova planilha sobre gravando a oficial
+        if file.filename.endswith(".csv"):
+            df.to_csv(FILE_NAME_OFFICIAL, index=False)
+        else:
+            df.to_excel(FILE_NAME_OFFICIAL, index=False)
         
         ultima_linha = df.iloc[-1].values
         ultimo_concurso_global = extrair_dezenas_linha(ultima_linha)
