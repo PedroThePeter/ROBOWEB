@@ -1,23 +1,20 @@
 import os
 import glob
 import io
+import joblib
 import pandas as pd
 import numpy as np
-import requests
-import urllib3
 from typing import List, Tuple, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.multioutput import MultiOutputClassifier
-
-# Desativa avisos de SSL ao consultar a API da Caixa na nuvem
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from supabase import create_client, Client
 
 app = FastAPI(title="Robô Lotofácil Inteligente API")
 
-# Habilita CORS para o frontend (React) conseguir acessar a API na web sem bloqueios
+# Habilita CORS para o frontend (React)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,8 +23,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Estado Global na Memória
+# ---------------------------------------------------------
+# CONFIGURAÇÃO DO SUPABASE
+# ---------------------------------------------------------
+SUPABASE_URL = os.getenv("SUPABASE_URL", "SUA_URL_DO_SUPABASE")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "SUA_KEY_DO_SUPABASE")
+BUCKET_NAME = "lotofacil-storage"
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Nomes dos arquivos persistentes
 FILE_NAME_OFFICIAL = "historico_oficial.xlsx"
+MODEL_FILE_NAME = "modelo_rf_lotofacil.joblib"
+
+# Estado Global na Memória
 dataframe_global: Optional[pd.DataFrame] = None
 ultimo_concurso_global: Optional[List[int]] = None
 ultimo_numero_concurso: int = 0
@@ -36,6 +45,93 @@ session_id_global: str = "sessao_oficial"
 # Constantes Estatísticas (Regras de Ouro)
 MOLDURA = {1, 2, 3, 4, 5, 6, 10, 11, 15, 16, 20, 21, 22, 23, 24, 25}
 PRIMOS = {2, 3, 5, 7, 11, 13, 17, 19, 23}
+
+
+# ---------------------------------------------------------
+# FUNÇÕES DE SINCRONIZAÇÃO COM NUVEM (SUPABASE)
+# ---------------------------------------------------------
+
+def baixar_do_supabase(filename: str) -> bool:
+    """ Baixa um arquivo do Supabase Storage para o disco local do Render """
+    try:
+        res = supabase.storage.from_(BUCKET_NAME).download(filename)
+        with open(filename, "wb") as f:
+            f.write(res)
+        print(f"✅ Arquivo '{filename}' restaurado da nuvem Supabase.")
+        return True
+    except Exception as e:
+        print(f"ℹ️ Arquivo '{filename}' não encontrado no Supabase ou erro na busca: {e}")
+        return False
+
+
+def enviar_para_supabase(filepath: str, filename: str):
+    """ Envia ou atualiza um arquivo no Supabase Storage """
+    try:
+        with open(filepath, "rb") as f:
+            try:
+                supabase.storage.from_(BUCKET_NAME).upload(
+                    path=filename,
+                    file=f,
+                    file_options={"upsert": "true"}
+                )
+            except Exception:
+                # Fallback caso o arquivo já exista (Update)
+                f.seek(0)
+                supabase.storage.from_(BUCKET_NAME).update(
+                    path=filename,
+                    file=f,
+                    file_options={"upsert": "true"}
+                )
+        print(f"🚀 Arquivo '{filename}' salvo permanentemente no Supabase!")
+    except Exception as e:
+        print(f"❌ Erro ao enviar '{filename}' para o Supabase: {e}")
+
+
+def carregar_base_e_modelo_inicial():
+    """ Tenta restaurar os arquivos do Supabase antes de ligar o servidor """
+    global dataframe_global, ultimo_concurso_global, ultimo_numero_concurso
+    
+    print("🔄 Inicializando sistema e buscando backups no Supabase...")
+    
+    # Baixa planilha e modelo da nuvem
+    baixar_do_supabase(FILE_NAME_OFFICIAL)
+    baixar_do_supabase(MODEL_FILE_NAME)
+
+    # Verifica qual arquivo base usar
+    arquivo_base = None
+    if os.path.exists(FILE_NAME_OFFICIAL):
+        arquivo_base = FILE_NAME_OFFICIAL
+    else:
+        arquivos = glob.glob("*.xlsx") + glob.glob("*.csv")
+        if arquivos:
+            arquivo_base = arquivos[0]
+
+    if arquivo_base:
+        try:
+            if arquivo_base.endswith(".csv"):
+                df = pd.read_csv(arquivo_base)
+            else:
+                df = pd.read_excel(arquivo_base)
+
+            dataframe_global = df
+            
+            ultima_linha = df.iloc[-1].values
+            ultimo_concurso_global = extrair_dezenas_linha(ultima_linha)
+            
+            if "Concurso" in df.columns:
+                ultimo_numero_concurso = int(df["Concurso"].dropna().iloc[-1])
+            else:
+                ultimo_numero_concurso = len(df)
+
+            print(f"📊 Base local carregada! Último concurso registrado: #{ultimo_numero_concurso}")
+
+        except Exception as e:
+            print(f"❌ Erro ao ler planilha inicial: {e}")
+    else:
+        print("⚠️ Nenhuma planilha base encontrada localmente ou na nuvem. Aguardando envio via upload.")
+
+# Executa no boot
+carregar_base_e_modelo_inicial()
 
 
 # ---------------------------------------------------------
@@ -57,27 +153,22 @@ def extrair_dezenas_linha(row) -> List[int]:
 
 def e_jogo_valido(jogo: List[int], ultimo_resultado: Optional[List[int]] = None) -> bool:
     """ Valida se o palpite cumpre as 'Regras de Ouro' estatísticas da Lotofácil """
-    # 1. Soma Total (Faixa ideal: 180 a 220)
     soma = sum(jogo)
     if not (180 <= soma <= 220):
         return False
 
-    # 2. Equilibrio Par / Ímpar (6 a 9 pares)
     pares = len([n for n in jogo if n % 2 == 0])
     if pares not in [6, 7, 8, 9]:
         return False
 
-    # 3. Quantidade na Moldura/Borda (8 a 11 números)
     moldura = len([n for n in jogo if n in MOLDURA])
     if moldura not in [8, 9, 10, 11]:
         return False
 
-    # 4. Quantidade de Primos (4 a 7 primos)
     primos = len([n for n in jogo if n in PRIMOS])
     if primos not in [4, 5, 6, 7]:
         return False
 
-    # 5. Repetição do Último Concurso (8 a 10 repetidos)
     if ultimo_resultado and len(ultimo_resultado) == 15:
         repetidos = len(set(jogo).intersection(set(ultimo_resultado)))
         if repetidos not in [8, 9, 10]:
@@ -87,141 +178,11 @@ def e_jogo_valido(jogo: List[int], ultimo_resultado: Optional[List[int]] = None)
 
 
 # ---------------------------------------------------------
-# SINCRONIZAÇÃO E LEITURA DA PLANILHA / CAIXA
-# ---------------------------------------------------------
-
-def carregar_e_sincronizar_base():
-    """ Carrega a planilha oficial do disco e busca novos concursos na Caixa """
-    global dataframe_global, ultimo_concurso_global, ultimo_numero_concurso
-    
-    print("Iniciando robô e verificando atualizações...")
-    
-    if not os.path.exists(FILE_NAME_OFFICIAL):
-        arquivos = glob.glob("*.xlsx") + glob.glob("*.csv")
-        if arquivos:
-            arquivo_base = arquivos[0]
-        else:
-            print("⚠️ Nenhuma planilha base encontrada. Aguardando envio via upload.")
-            return
-    else:
-        arquivo_base = FILE_NAME_OFFICIAL
-
-    try:
-        if arquivo_base.endswith(".csv"):
-            df = pd.read_csv(arquivo_base)
-        else:
-            df = pd.read_excel(arquivo_base)
-
-        dataframe_global = df
-        
-        ultima_linha = df.iloc[-1].values
-        ultimo_concurso_global = extrair_dezenas_linha(ultima_linha)
-        
-        if "Concurso" in df.columns:
-            ultimo_numero_concurso = int(df["Concurso"].dropna().iloc[-1])
-        else:
-            ultimo_numero_concurso = len(df)
-
-        print(f"📊 Base carregada! Último concurso registrado: #{ultimo_numero_concurso}")
-
-        sincronizar_com_caixa()
-
-    except Exception as e:
-        print(f"❌ Erro ao ler planilha inicial: {e}")
-
-
-def sincronizar_com_caixa():
-    """ Consulta a API pública da Caixa fingindo ser um navegador para evitar bloqueios """
-    global dataframe_global, ultimo_concurso_global, ultimo_numero_concurso
-    
-    if ultimo_numero_concurso <= 0:
-        return
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "application/json",
-        "Referer": "https://loterias.caixa.gov.br/",
-        "Connection": "keep-alive"
-    }
-
-    proximo_concurso = ultimo_numero_concurso + 1
-    novos_sorteios = []
-
-    print(f"🔎 Buscando o concurso {proximo_concurso} na internet...")
-
-    while True:
-        url = f"https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil/{proximo_concurso}"
-        try:
-            res = requests.get(url, headers=headers, verify=False, timeout=10)
-            
-            if res.status_code == 200:
-                data = res.json()
-                lista = data.get("listaDezenas", []) or data.get("dezenasSorteadasOrdemSorteio", [])
-                
-                dezenas = [int(n) for n in lista]
-                if len(dezenas) == 15:
-                    dezenas.sort()
-                    novos_sorteios.append({
-                        "Concurso": proximo_concurso,
-                        "Dezenas": dezenas
-                    })
-                    ultimo_concurso_global = dezenas
-                    ultimo_numero_concurso = proximo_concurso
-                    print(f"✅ Sucesso! Concurso {proximo_concurso} baixado: {dezenas}")
-                    proximo_concurso += 1
-                    continue
-                    
-            elif res.status_code == 404:
-                print(f"👍 Tudo atualizado! O concurso {proximo_concurso} ainda não foi sorteado (404).")
-                break
-            elif res.status_code == 403:
-                print(f"🛑 BLOQUEIO CAIXA (403): O IP do Render foi bloqueado ao tentar buscar o concurso {proximo_concurso}.")
-                break
-            else:
-                print(f"⚠️ Falha inesperada. Código da Caixa: {res.status_code}")
-                break
-                
-        except requests.exceptions.Timeout:
-            print(f"⏳ Tempo esgotado ao conectar com a Caixa no concurso {proximo_concurso}.")
-            break
-        except Exception as e:
-            print(f"❌ Erro na conexão: {e}")
-            break
-
-    if novos_sorteios and dataframe_global is not None:
-        try:
-            novas_linhas = []
-            for item in novos_sorteios:
-                row_dict = {"Concurso": item["Concurso"]}
-                for i, d in enumerate(item["Dezenas"], 1):
-                    row_dict[f"Bola{i}"] = d
-                novas_linhas.append(row_dict)
-            
-            df_novos = pd.DataFrame(novas_linhas)
-            dataframe_global = pd.concat([dataframe_global, df_novos], ignore_index=True)
-            
-            if FILE_NAME_OFFICIAL.endswith(".csv"):
-                dataframe_global.to_csv(FILE_NAME_OFFICIAL, index=False)
-            else:
-                dataframe_global.to_excel(FILE_NAME_OFFICIAL, index=False)
-                
-            print(f"🚀 Banco de dados atualizado! +{len(novos_sorteios)} sorteio(s) adicionado(s) à planilha.")
-        except Exception as e:
-            print(f"⚠️ Erro ao salvar atualização no arquivo: {e}")
-
-    print("✅ Processo de sincronização finalizado!")
-
-
-# Inicializa o carregamento no boot
-carregar_e_sincronizar_base()
-
-
-# ---------------------------------------------------------
-# MACHINE LEARNING (RANDOM FOREST)
+# MACHINE LEARNING COM PERSISTÊNCIA JOBLIB
 # ---------------------------------------------------------
 
 def extrair_features_e_target(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
-    """ Converte o histórico de concursos em matrizes de treino (X) e alvos (Y) """
+    """ Converte o histórico de concursos em matrizes de treino (X) e alvos (Y) (Versão Completa) """
     dezenas_por_concurso = [extrair_dezenas_linha(df.iloc[i].values) for i in range(len(df))]
     
     X, Y = [], []
@@ -257,25 +218,46 @@ def extrair_features_e_target(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]
     return np.array(X), np.array(Y)
 
 
-def treinar_e_prever_probabilidades_rf(df: pd.DataFrame) -> np.ndarray:
-    """ Treina o Random Forest e calcula a probabilidade atual para cada uma das 25 dezenas """
+def treinar_ou_carregar_rf(df: pd.DataFrame):
+    """ Carrega o modelo treinado do disco (Supabase) ou treina um novo e o envia para a nuvem """
+    if os.path.exists(MODEL_FILE_NAME):
+        try:
+            model = joblib.load(MODEL_FILE_NAME)
+            print("🧠 Modelo Random Forest pré-treinado carregado com sucesso.")
+            return model
+        except Exception as e:
+            print(f"⚠️ Erro ao carregar modelo local, re-treinando... {e}")
+
+    print("⚙️ Treinando novo modelo Random Forest e salvando no Supabase...")
+    X, Y = extrair_features_e_target(df)
+    
+    rf_base = RandomForestClassifier(n_estimators=60, max_depth=6, random_state=42, n_jobs=-1)
+    model = MultiOutputClassifier(rf_base)
+    if len(X) > 0:
+        model.fit(X, Y)
+
+    # Salva localmente e envia para o Supabase Storage
+    joblib.dump(model, MODEL_FILE_NAME)
+    enviar_para_supabase(MODEL_FILE_NAME, MODEL_FILE_NAME)
+
+    return model
+
+
+def prever_probabilidades_rf(df: pd.DataFrame, is_backtest: bool = False) -> np.ndarray:
+    """ Calcula a probabilidade atual para cada dezena """
     if df is None or len(df) < 40:
         return np.full(25, 0.60)
 
-    X, Y = extrair_features_e_target(df)
-    
-    if len(X) == 0:
-        return np.full(25, 0.60)
-
-    rf_base = RandomForestClassifier(
-        n_estimators=60,
-        max_depth=6,
-        random_state=42,
-        n_jobs=-1
-    )
-    
-    model = MultiOutputClassifier(rf_base)
-    model.fit(X, Y)
+    # Se for backtest, treina um modelo efêmero sem salvar no disco (para não sujar a base oficial)
+    if is_backtest:
+        X, Y = extrair_features_e_target(df)
+        rf_base = RandomForestClassifier(n_estimators=60, max_depth=6, random_state=42, n_jobs=-1)
+        model = MultiOutputClassifier(rf_base)
+        if len(X) > 0:
+            model.fit(X, Y)
+    else:
+        # Se for geração real, usa o modelo persistido do Supabase/Disco
+        model = treinar_ou_carregar_rf(df)
     
     dezenas_totais = [extrair_dezenas_linha(df.iloc[i].values) for i in range(len(df))]
     ultimos_10 = dezenas_totais[-10:]
@@ -307,9 +289,9 @@ def treinar_e_prever_probabilidades_rf(df: pd.DataFrame) -> np.ndarray:
     return np.array(probs_dezenas)
 
 
-def gerar_jogos_ml_com_ranking(df: pd.DataFrame, count: int = 5):
-    """ Gera palpites e retorna junto com o ranking de probabilidade do Random Forest """
-    probs = treinar_e_prever_probabilidades_rf(df)
+def gerar_jogos_ml_com_ranking(df: pd.DataFrame, count: int = 5, is_backtest: bool = False):
+    """ Gera palpites e retorna junto com o ranking de probabilidade """
+    probs = prever_probabilidades_rf(df, is_backtest)
     
     ranking = []
     for num in range(1, 26):
@@ -358,7 +340,7 @@ def get_status():
     global dataframe_global, ultimo_concurso_global, session_id_global
     
     if dataframe_global is None:
-        carregar_e_sincronizar_base()
+        carregar_base_e_modelo_inicial()
         
     return {
         "session_id": session_id_global,
@@ -378,24 +360,36 @@ async def upload_file(file: UploadFile = File(...)):
         contents = await file.read()
         if file.filename.endswith(".csv"):
             df = pd.read_csv(io.BytesIO(contents))
+            df.to_csv(FILE_NAME_OFFICIAL, index=False)
         else:
             df = pd.read_excel(io.BytesIO(contents))
+            df.to_excel(FILE_NAME_OFFICIAL, index=False)
 
         dataframe_global = df
         
-        if file.filename.endswith(".csv"):
-            df.to_csv(FILE_NAME_OFFICIAL, index=False)
-        else:
-            df.to_excel(FILE_NAME_OFFICIAL, index=False)
-        
         ultima_linha = df.iloc[-1].values
         ultimo_concurso_global = extrair_dezenas_linha(ultima_linha)
-        ultimo_numero_concurso = len(df)
+        
+        if "Concurso" in df.columns:
+            ultimo_numero_concurso = int(df["Concurso"].dropna().iloc[-1])
+        else:
+            ultimo_numero_concurso = len(df)
+
+        # Envia a nova planilha para o Supabase
+        enviar_para_supabase(FILE_NAME_OFFICIAL, FILE_NAME_OFFICIAL)
+        
+        # Como a base mudou, apaga o modelo velho localmente e no Supabase 
+        # para forçar a IA a retreinar na próxima vez que gerar jogos
+        if os.path.exists(MODEL_FILE_NAME):
+            os.remove(MODEL_FILE_NAME)
 
         return {
             "session_id": session_id_global,
             "last_draw": ultimo_concurso_global,
-            "stats": {"total_concursos": len(df)}
+            "stats": {
+                "total_concursos": len(df),
+                "ultimo_concurso": ultimo_numero_concurso
+            }
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Erro ao processar arquivo: {str(e)}")
@@ -403,7 +397,7 @@ async def upload_file(file: UploadFile = File(...)):
 
 @app.post("/api/generate")
 def generate_tickets(req: GenerateRequest):
-    jogos, ranking = gerar_jogos_ml_com_ranking(dataframe_global, count=req.count)
+    jogos, ranking = gerar_jogos_ml_com_ranking(dataframe_global, count=req.count, is_backtest=False)
     return {
         "tickets": jogos,
         "ranking": ranking
@@ -448,7 +442,8 @@ async def run_backtest(
         if len(resultado_real) < 15:
             continue
 
-        bilhetes_gerados, _ = gerar_jogos_ml_com_ranking(df_historico_passado, count=bets_per_draw)
+        # Passamos is_backtest=True para não gravar o modelo de simulação no Supabase
+        bilhetes_gerados, _ = gerar_jogos_ml_com_ranking(df_historico_passado, count=bets_per_draw, is_backtest=True)
         total_apostas += len(bilhetes_gerados)
 
         for bilhete in bilhetes_gerados:
