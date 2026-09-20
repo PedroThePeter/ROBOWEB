@@ -11,11 +11,14 @@ export default function App() {
   const [palpiteOficial, setPalpiteOficial] = useState(null);
   const [arquivoNome, setArquivoNome] = useState(null);
 
+  // URL Oficial do Backend no Render
+  const API_URL = 'https://roboweb-cvha.onrender.com';
+
   // Executar backtest (1000 concursos)
   const executarBacktest = async () => {
     setIsSimulating(true);
     try {
-      const response = await fetch('https://roboweb-cvha.onrender.com/api/backtest');
+      const response = await fetch(`${API_URL}/api/backtest`);
       if (!response.ok) throw new Error('Falha na resposta do servidor.');
       const data = await response.json();
       setResultados(data);
@@ -35,7 +38,7 @@ export default function App() {
       formData.append("file", file);
 
       try {
-        const response = await fetch('https://roboweb-cvha.onrender.com/api/upload', {
+        const response = await fetch(`${API_URL}/api/upload`, {
           method: 'POST',
           body: formData,
         });
