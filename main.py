@@ -1,14 +1,14 @@
 import os
 import pandas as pd
 import numpy as np
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 
 # =====================================================================
 # 1. MOTOR ESTATÍSTICO REAL & 3º CURADOR (ENSEMBLE)
 # =====================================================================
 class CuradorLotofacil:
-    def __init__(self, taxa_aprendizado=0.05):
+    def __init__(self, taxa_aprendizado=0.03):
         self.lr = taxa_aprendizado
         
         # Escala Assimétrica de Recompensa/Punição
@@ -65,31 +65,23 @@ class CuradorLotofacil:
 # 2. SUB-MODELOS BASEADOS EM ESTATÍSTICA REAL
 # =====================================================================
 def calcular_modelo_frequencia(historico):
-    # Seleciona as 15 dezenas que mais apareceram no histórico fornecido
     todas_dezenas = [dez for concurso in historico for dez in concurso]
     contagem = pd.Series(todas_dezenas).value_counts()
     top_15 = contagem.head(15).index.tolist()
     return sorted([int(d) for d in top_15])
 
 def calcular_modelo_atrasos(historico, concurso_atual_idx):
-    # Seleciona as dezenas que estão há mais concursos sem sair (atrasadas)
     ultimas_vistas = {d: -1 for d in range(1, 26)}
     for idx, concurso in enumerate(historico[:concurso_atual_idx]):
         for dez in concurso:
             ultimas_vistas[dez] = idx
             
-    # Ordena pelo concurso mais antigo em que apareceu (maior atraso)
     atrasos_ordenados = sorted(ultimas_vistas.keys(), key=lambda d: ultimas_vistas[d])
     return sorted(atrasos_ordenados[:15])
 
 def calcular_modelo_padroes(historico):
-    # Modelo baseado em equilíbrio estrutural (ímpares, primos e soma central)
-    # Filtra dezenas com base em propriedades matemáticas consistentes
-    primos = {2, 3, 5, 7, 11, 13, 17, 19, 23}
     impares = [d for d in range(1, 26) if d % 2 != 0]
     pares = [d for d in range(1, 26) if d % 2 == 0]
-    
-    # Seleção equilibrada determinística
     selecionadas = sorted(impares[:8] + pares[:7])
     if len(selecionadas) < 15:
         restantes = [d for d in range(1, 26) if d not in selecionadas]
@@ -102,7 +94,6 @@ def calcular_modelo_padroes(historico):
 # =====================================================================
 def carregar_dados_caixa(caminho_arquivo="Lotofacil.xlsx"):
     if not os.path.exists(caminho_arquivo):
-        # Fallback estruturado se o ficheiro não estiver presente no servidor
         np.random.seed(42)
         return [list(np.random.choice(range(1, 26), 15, replace=False)) for _ in range(3501)]
     
@@ -129,12 +120,23 @@ app.add_middleware(
 def read_root():
     return {"status": "online", "message": "Motor estatístico determinístico e 3º Curador ativos!"}
 
+@app.post("/api/upload")
+async def upload_planilha(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        with open("Lotofacil.xlsx", "wb") as f:
+            f.write(contents)
+        return {"status": "success", "message": f"Ficheiro {file.filename} carregado e salvo com sucesso no servidor!"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.get("/api/backtest")
 def executar_backtest_api():
     banco_de_dados = carregar_dados_caixa()
     curador = CuradorLotofacil(taxa_aprendizado=0.03)
     
-    inicio = max(50, len(banco_de_dados) - 1500)
+    # Janela ajustada para os últimos 1000 concursos
+    inicio = max(50, len(banco_de_dados) - 1000)
     fim = len(banco_de_dados) - 1
     
     historico_acertos_ensemble = []
@@ -142,12 +144,10 @@ def executar_backtest_api():
     
     acertos_modelos_total = {'Modelo_Frequencia': [], 'Modelo_Atrasos': [], 'Modelo_Padroes': []}
 
-    # Walk-Forward Backtesting determinístico baseado em dados reais
     for concurso_atual in range(inicio, fim + 1):
         historico_disponivel = banco_de_dados[:concurso_atual]
         sorteio_real = banco_de_dados[concurso_atual]
         
-        # Geração de palpites analíticos reais (sem aleatoriedade cega)
         palpites = {
             'Modelo_Frequencia': calcular_modelo_frequencia(historico_disponivel),
             'Modelo_Atrasos': calcular_modelo_atrasos(banco_de_dados, concurso_atual),

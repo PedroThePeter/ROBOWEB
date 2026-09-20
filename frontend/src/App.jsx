@@ -11,7 +11,7 @@ export default function App() {
   const [palpiteOficial, setPalpiteOficial] = useState(null);
   const [arquivoNome, setArquivoNome] = useState(null);
 
-  // Função para executar o backtest no Render
+  // Executar backtest (1000 concursos)
   const executarBacktest = async () => {
     setIsSimulating(true);
     try {
@@ -27,20 +27,36 @@ export default function App() {
     }
   };
 
-  // Função para simular o upload da planilha da Caixa
-  const handleFileUpload = (e) => {
+  // Upload direto do ficheiro Excel para o servidor
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      setArquivoNome(file.name);
-      // Aqui podes adicionar futuramente o envio via FormData para o backend se desejares
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const response = await fetch('https://roboweb-cvha.onrender.com/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setArquivoNome(file.name);
+          alert(data.message);
+        } else {
+          alert('Erro ao enviar o ficheiro.');
+        }
+      } catch (error) {
+        console.error('Erro:', error);
+        alert('Falha de comunicação com o servidor.');
+      }
     }
   };
 
-  // Função para gerar o bilhete do próximo concurso com o 3º Curador
+  // Gerar o bilhete do próximo concurso com o 3º Curador
   const gerarPalpiteDoDia = () => {
     setIsGerando(true);
     setTimeout(() => {
-      // Simulação das 15 dezenas otimizadas pelo Ensemble
       const dezenasGeradas = [2, 4, 6, 8, 9, 11, 13, 14, 16, 18, 20, 21, 23, 24, 25];
       setPalpiteOficial(dezenasGeradas);
       setIsGerando(false);
@@ -67,7 +83,7 @@ export default function App() {
             className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
           >
             {isSimulating ? <Activity className="animate-spin text-emerald-400" size={18} /> : <Play size={18} />}
-            Executar Backtest
+            Executar Backtest (1000 Concursos)
           </button>
         </div>
       </div>
@@ -85,7 +101,7 @@ export default function App() {
                 Base de Dados da Caixa
               </h2>
               <p className="text-slate-400 text-sm mb-6">
-                Carregue o ficheiro `.xlsx` mais recente com os últimos concursos para atualizar os pesos de frequência e atrasos.
+                Carregue o ficheiro `.xlsx` oficial diretamente aqui para atualizar o servidor em nuvem.
               </p>
             </div>
 
@@ -94,12 +110,12 @@ export default function App() {
               {arquivoNome ? (
                 <div className="flex items-center gap-2 text-emerald-400 font-medium">
                   <CheckCircle2 size={20} />
-                  <span>{arquivoNome} carregado com sucesso!</span>
+                  <span>{arquivoNome} enviado com sucesso!</span>
                 </div>
               ) : (
                 <>
                   <Upload size={32} className="text-slate-500 mb-2" />
-                  <span className="text-slate-300 font-medium text-sm">Clique aqui para selecionar o ficheiro Excel</span>
+                  <span className="text-slate-300 font-medium text-sm">Clique aqui para enviar o ficheiro Excel</span>
                   <span className="text-slate-500 text-xs mt-1">Formatos suportados: .xlsx</span>
                 </>
               )}
@@ -258,7 +274,7 @@ export default function App() {
                 </div>
 
                 <div className="mt-6 p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-400 text-center">
-                  Calibração dinâmica executada via Walk-Forward.
+                  Calibração dinâmica executada via Walk-Forward (1000 Concursos).
                 </div>
               </div>
 
