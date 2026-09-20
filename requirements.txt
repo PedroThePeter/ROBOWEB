@@ -1,9 +1,17 @@
-fastapi
-uvicorn
-pandas
-numpy
-scikit-learn
-joblib
-supabase
-openpyxl
-python-multipart
+# ==========================================
+# LOTOFÁCIL ENSEMBLE AI - DEPENDÊNCIAS PYTHON
+# ==========================================
+
+# Processamento de Dados e Estatística
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Leitura da Planilha Oficial da Caixa (.xlsx)
+openpyxl>=3.1.0
+
+# Visualização de Gráficos Locais (Script / Jupyter)
+matplotlib>=3.7.0
+
+# Servidor API (Conexão do main.py com o App.jsx)
+fastapi>=0.100.0
+uvicorn>=0.22.0

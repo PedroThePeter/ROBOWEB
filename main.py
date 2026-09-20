@@ -1,470 +1,206 @@
 import os
-import glob
-import io
-import joblib
 import pandas as pd
 import numpy as np
-from typing import List, Tuple, Optional
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.multioutput import MultiOutputClassifier
-from supabase import create_client, Client
+import matplotlib.pyplot as plt
 
-app = FastAPI(title="Robô Lotofácil Inteligente API")
-
-# Habilita CORS para o frontend (React)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ---------------------------------------------------------
-# CONFIGURAÇÃO DO SUPABASE
-# ---------------------------------------------------------
-SUPABASE_URL = os.getenv("SUPABASE_URL", "SUA_URL_DO_SUPABASE")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "SUA_KEY_DO_SUPABASE")
-BUCKET_NAME = "lotofacil-storage"
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# Nomes dos arquivos persistentes
-FILE_NAME_OFFICIAL = "historico_oficial.xlsx"
-MODEL_FILE_NAME = "modelo_rf_lotofacil.joblib"
-
-# Estado Global na Memória
-dataframe_global: Optional[pd.DataFrame] = None
-ultimo_concurso_global: Optional[List[int]] = None
-ultimo_numero_concurso: int = 0
-session_id_global: str = "sessao_oficial"
-
-# Constantes Estatísticas (Regras de Ouro)
-MOLDURA = {1, 2, 3, 4, 5, 6, 10, 11, 15, 16, 20, 21, 22, 23, 24, 25}
-PRIMOS = {2, 3, 5, 7, 11, 13, 17, 19, 23}
-
-
-# ---------------------------------------------------------
-# FUNÇÕES DE SINCRONIZAÇÃO COM NUVEM (SUPABASE)
-# ---------------------------------------------------------
-
-def baixar_do_supabase(filename: str) -> bool:
-    """ Baixa um arquivo do Supabase Storage para o disco local do Render """
-    try:
-        res = supabase.storage.from_(BUCKET_NAME).download(filename)
-        with open(filename, "wb") as f:
-            f.write(res)
-        print(f"✅ Arquivo '{filename}' restaurado da nuvem Supabase.")
-        return True
-    except Exception as e:
-        print(f"ℹ️ Arquivo '{filename}' não encontrado no Supabase ou erro na busca: {e}")
-        return False
-
-
-def enviar_para_supabase(filepath: str, filename: str):
-    """ Envia ou atualiza um arquivo no Supabase Storage """
-    try:
-        with open(filepath, "rb") as f:
-            try:
-                supabase.storage.from_(BUCKET_NAME).upload(
-                    path=filename,
-                    file=f,
-                    file_options={"upsert": "true"}
-                )
-            except Exception:
-                # Fallback caso o arquivo já exista (Update)
-                f.seek(0)
-                supabase.storage.from_(BUCKET_NAME).update(
-                    path=filename,
-                    file=f,
-                    file_options={"upsert": "true"}
-                )
-        print(f"🚀 Arquivo '{filename}' salvo permanentemente no Supabase!")
-    except Exception as e:
-        print(f"❌ Erro ao enviar '{filename}' para o Supabase: {e}")
-
-
-def carregar_base_e_modelo_inicial():
-    """ Tenta restaurar os arquivos do Supabase antes de ligar o servidor """
-    global dataframe_global, ultimo_concurso_global, ultimo_numero_concurso
-    
-    print("🔄 Inicializando sistema e buscando backups no Supabase...")
-    
-    # Baixa planilha e modelo da nuvem
-    baixar_do_supabase(FILE_NAME_OFFICIAL)
-    baixar_do_supabase(MODEL_FILE_NAME)
-
-    # Verifica qual arquivo base usar
-    arquivo_base = None
-    if os.path.exists(FILE_NAME_OFFICIAL):
-        arquivo_base = FILE_NAME_OFFICIAL
-    else:
-        arquivos = glob.glob("*.xlsx") + glob.glob("*.csv")
-        if arquivos:
-            arquivo_base = arquivos[0]
-
-    if arquivo_base:
-        try:
-            if arquivo_base.endswith(".csv"):
-                df = pd.read_csv(arquivo_base)
-            else:
-                df = pd.read_excel(arquivo_base)
-
-            dataframe_global = df
-            
-            ultima_linha = df.iloc[-1].values
-            ultimo_concurso_global = extrair_dezenas_linha(ultima_linha)
-            
-            if "Concurso" in df.columns:
-                ultimo_numero_concurso = int(df["Concurso"].dropna().iloc[-1])
-            else:
-                ultimo_numero_concurso = len(df)
-
-            print(f"📊 Base local carregada! Último concurso registrado: #{ultimo_numero_concurso}")
-
-        except Exception as e:
-            print(f"❌ Erro ao ler planilha inicial: {e}")
-    else:
-        print("⚠️ Nenhuma planilha base encontrada localmente ou na nuvem. Aguardando envio via upload.")
-
-# Executa no boot
-carregar_base_e_modelo_inicial()
-
-
-# ---------------------------------------------------------
-# FUNÇÕES AUXILIARES DE TRATAMENTO DE DADOS
-# ---------------------------------------------------------
-
-def extrair_dezenas_linha(row) -> List[int]:
-    """ Extrai as 15 dezenas de uma linha do DataFrame """
-    numeros = []
-    for val in row:
-        try:
-            num = int(val)
-            if 1 <= num <= 25:
-                numeros.append(num)
-        except (ValueError, TypeError):
-            continue
-    return sorted(numeros[-15:]) if len(numeros) >= 15 else sorted(numeros)
-
-
-def e_jogo_valido(jogo: List[int], ultimo_resultado: Optional[List[int]] = None) -> bool:
-    """ Valida se o palpite cumpre as 'Regras de Ouro' estatísticas da Lotofácil """
-    soma = sum(jogo)
-    if not (180 <= soma <= 220):
-        return False
-
-    pares = len([n for n in jogo if n % 2 == 0])
-    if pares not in [6, 7, 8, 9]:
-        return False
-
-    moldura = len([n for n in jogo if n in MOLDURA])
-    if moldura not in [8, 9, 10, 11]:
-        return False
-
-    primos = len([n for n in jogo if n in PRIMOS])
-    if primos not in [4, 5, 6, 7]:
-        return False
-
-    if ultimo_resultado and len(ultimo_resultado) == 15:
-        repetidos = len(set(jogo).intersection(set(ultimo_resultado)))
-        if repetidos not in [8, 9, 10]:
-            return False
-
-    return True
-
-
-# ---------------------------------------------------------
-# MACHINE LEARNING COM PERSISTÊNCIA JOBLIB
-# ---------------------------------------------------------
-
-def extrair_features_e_target(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
-    """ Converte o histórico de concursos em matrizes de treino (X) e alvos (Y) (Versão Completa) """
-    dezenas_por_concurso = [extrair_dezenas_linha(df.iloc[i].values) for i in range(len(df))]
-    
-    X, Y = [], []
-    janela_minima = 30
-    
-    for i in range(janela_minima, len(dezenas_por_concurso)):
-        historico_passado = dezenas_por_concurso[:i]
-        sorteio_atual = set(dezenas_por_concurso[i])
+# =====================================================================
+# 1. CLASSE DO 3º CURADOR & ENSEMBLE
+# =====================================================================
+class CuradorLotofacil:
+    def __init__(self, taxa_aprendizado=0.05):
+        # Freio de mão conservador (2% a 5%)
+        self.lr = taxa_aprendizado
         
-        ultimos_10 = historico_passado[-10:]
-        ultimos_25 = historico_passado[-25:]
-        ultimo_sorteio = set(historico_passado[-1])
+        # Escala Assimétrica de Recompensa/Punição (O Placar)
+        self.escala_recompensa = {
+            **{i: -1.0 for i in range(11)},  # 0 a 10 acertos: Punição (-1.0)
+            11: 0.0,                         # 11 acertos: Neutro (0.0)
+            12: 1.0,                         # 12 acertos: Recompensa leve (+1.0)
+            13: 3.0,                         # 13 acertos: Recompensa forte (+3.0)
+            14: 10.0,                        # 14 acertos: Recompensa máxima (+10.0)
+            15: 10.0                         # 15 acertos: Jackpot (+10.0)
+        }
         
-        features_i = []
-        for num in range(1, 26):
-            freq_10 = sum(1 for jogo in ultimos_10 if num in jogo) / 10.0
-            freq_25 = sum(1 for jogo in ultimos_25 if num in jogo) / 25.0
-            saiu_ultimo = 1 if num in ultimo_sorteio else 0
+        # Pesos Iniciais dos Sub-modelos (Equilibrados)
+        self.pesos = {
+            'Modelo_Frequencia': 0.333,
+            'Modelo_Atrasos': 0.333,
+            'Modelo_Padroes': 0.334
+        }
+        
+        # Histórico de Desempenho para Auditoria
+        self.historico_pesos = {modelo: [] for modelo in self.pesos.keys()}
+        self.historico_acertos_modelos = {modelo: [] for modelo in self.pesos.keys()}
+        self.historico_acertos_ensemble = []
+
+    def avaliar_palpite(self, palpite, sorteio_real):
+        """Calcula a quantidade de acertos entre o palpite e o sorteio real."""
+        return len(set(palpite).intersection(set(sorteio_real)))
+
+    def recalibrar_pesos(self, acertos_rodada):
+        """O Coração do 3º Curador: Aplica punição/recompensa e normaliza os pesos."""
+        novos_pesos = {}
+        
+        for modelo, acertos in acertos_rodada.items():
+            multiplicador = self.escala_recompensa.get(acertos, -1.0)
             
-            atraso = 0
-            for idx, jogo in enumerate(reversed(historico_passado)):
-                if num in jogo:
-                    atraso = idx
-                    break
-            
-            features_i.extend([freq_10, freq_25, saiu_ultimo, atraso])
-            
-        target_i = [1 if num in sorteio_atual else 0 for num in range(1, 26)]
+            # Atualiza o peso garantindo piso mínimo de 1% (evita zerar modelo)
+            peso_bruto = max(0.01, self.pesos[modelo] + (multiplicador * self.lr))
+            novos_pesos[modelo] = peso_bruto
+
+        # Normalização (Soma total dos pesos sempre = 100%)
+        soma_total = sum(novos_pesos.values())
+        for modelo in novos_pesos:
+            self.pesos[modelo] = novos_pesos[modelo] / soma_total
+
+    def montar_bilhete_ensemble(self, palpites_da_rodada):
+        """Aplica Votação Ponderada + Voto de Minerva do Modelo Alfa para o Bilhete Final."""
+        pontuacao = {dezena: 0.0 for dezena in range(1, 26)}
         
-        X.append(features_i)
-        Y.append(target_i)
-        
-    return np.array(X), np.array(Y)
-
-
-def treinar_ou_carregar_rf(df: pd.DataFrame):
-    """ Carrega o modelo treinado do disco (Supabase) ou treina um novo e o envia para a nuvem """
-    if os.path.exists(MODEL_FILE_NAME):
-        try:
-            model = joblib.load(MODEL_FILE_NAME)
-            print("🧠 Modelo Random Forest pré-treinado carregado com sucesso.")
-            return model
-        except Exception as e:
-            print(f"⚠️ Erro ao carregar modelo local, re-treinando... {e}")
-
-    print("⚙️ Treinando novo modelo Random Forest e salvando no Supabase...")
-    X, Y = extrair_features_e_target(df)
-    
-    rf_base = RandomForestClassifier(n_estimators=60, max_depth=6, random_state=42, n_jobs=-1)
-    model = MultiOutputClassifier(rf_base)
-    if len(X) > 0:
-        model.fit(X, Y)
-
-    # Salva localmente e envia para o Supabase Storage
-    joblib.dump(model, MODEL_FILE_NAME)
-    enviar_para_supabase(MODEL_FILE_NAME, MODEL_FILE_NAME)
-
-    return model
-
-
-def prever_probabilidades_rf(df: pd.DataFrame, is_backtest: bool = False) -> np.ndarray:
-    """ Calcula a probabilidade atual para cada dezena """
-    if df is None or len(df) < 40:
-        return np.full(25, 0.60)
-
-    # Se for backtest, treina um modelo efêmero sem salvar no disco (para não sujar a base oficial)
-    if is_backtest:
-        X, Y = extrair_features_e_target(df)
-        rf_base = RandomForestClassifier(n_estimators=60, max_depth=6, random_state=42, n_jobs=-1)
-        model = MultiOutputClassifier(rf_base)
-        if len(X) > 0:
-            model.fit(X, Y)
-    else:
-        # Se for geração real, usa o modelo persistido do Supabase/Disco
-        model = treinar_ou_carregar_rf(df)
-    
-    dezenas_totais = [extrair_dezenas_linha(df.iloc[i].values) for i in range(len(df))]
-    ultimos_10 = dezenas_totais[-10:]
-    ultimos_25 = dezenas_totais[-25:]
-    ultimo_sorteio = set(dezenas_totais[-1])
-    
-    features_proximo = []
-    for num in range(1, 26):
-        freq_10 = sum(1 for jogo in ultimos_10 if num in jogo) / 10.0
-        freq_25 = sum(1 for jogo in ultimos_25 if num in jogo) / 25.0
-        saiu_ultimo = 1 if num in ultimo_sorteio else 0
-        
-        atraso = 0
-        for idx, jogo in enumerate(reversed(dezenas_totais)):
-            if num in jogo:
-                atraso = idx
-                break
+        # 1. Votação Ponderada pelos Pesos
+        for modelo, palpite in palpites_da_rodada.items():
+            peso_atual = self.pesos[modelo]
+            for dezena in palpite:
+                pontuacao[dezena] += peso_atual
                 
-        features_proximo.extend([freq_10, freq_25, saiu_ultimo, atraso])
+        # 2. Identifica o Modelo Alfa do momento para critério de desempate
+        modelo_alfa = max(self.pesos, key=self.pesos.get)
+        palpite_alfa = palpites_da_rodada[modelo_alfa]
         
-    X_proximo = np.array([features_proximo])
-    probabilidades_raw = model.predict_proba(X_proximo)
-    
-    probs_dezenas = []
-    for i in range(25):
-        prob_1 = probabilidades_raw[i][0][1] if len(probabilidades_raw[i][0]) > 1 else 0.5
-        probs_dezenas.append(prob_1)
+        # 3. Ordenação por Pontuação + Desempate pelo Modelo Alfa
+        ranking = sorted(
+            pontuacao.keys(),
+            key=lambda d: (pontuacao[d], d in palpite_alfa),
+            reverse=True
+        )
         
-    return np.array(probs_dezenas)
+        # 4. Retorna as 15 dezenas definitivas do bilhete
+        return sorted(ranking[:15])
+
+    def registrar_historico(self, acertos_rodada, acertos_ensemble):
+        """Grava a evolução para gerar o dashboard final."""
+        for modelo in self.pesos.keys():
+            self.historico_pesos[modelo].append(self.pesos[modelo])
+            self.historico_acertos_modelos[modelo].append(acertos_rodada[modelo])
+        self.historico_acertos_ensemble.append(acertos_ensemble)
 
 
-def gerar_jogos_ml_com_ranking(df: pd.DataFrame, count: int = 5, is_backtest: bool = False):
-    """ Gera palpites e retorna junto com o ranking de probabilidade """
-    probs = prever_probabilidades_rf(df, is_backtest)
+# =====================================================================
+# 2. INGESTÃO DE DADOS (EXTRATOR CAIXA)
+# =====================================================================
+def extrair_dezenas_linha_caixa(caminho_arquivo="Lotofacil.xlsx"):
+    """
+    Carrega a planilha da Caixa e isola exatamente as 15 dezenas sorteadas de cada concurso.
+    """
+    if not os.path.exists(caminho_arquivo):
+        print(f"⚠️ Arquivo '{caminho_arquivo}' não encontrado. Gerando base simulada para teste...")
+        # Fallback para teste caso o arquivo não esteja no diretório local
+        return [list(np.random.choice(range(1, 26), 15, replace=False)) for _ in range(3501)]
+
+    print(f"📥 Lendo arquivo oficial: {caminho_arquivo}...")
+    df = pd.read_excel(caminho_arquivo)
     
-    ranking = []
-    for num in range(1, 26):
-        prob = float(probs[num - 1])
-        ranking.append({
-            "dezena": num,
-            "probabilidade": round(prob * 100, 2)
-        })
+    # Procura colunas que contêm as dezenas (ex: 'Bola1' até 'Bola15' ou colunas numéricas de sorteio)
+    colunas_bolas = [col for col in df.columns if 'bola' in str(col).lower() or 'dezena' in str(col).lower()]
     
-    ranking_ordenado = sorted(ranking, key=lambda x: x["probabilidade"], reverse=True)
+    if len(colunas_bolas) >= 15:
+        df_dezenas = df[colunas_bolas[:15]]
+    else:
+        # Se não encontrar pelos nomes, pega as 15 últimas colunas com dados numéricos
+        df_dezenas = df.select_dtypes(include=[np.number]).iloc[:, -15:]
+
+    historico_sorteios = df_dezenas.dropna().values.astype(int).tolist()
+    print(f"✅ Total de {len(historico_sorteios)} concursos oficiais carregados com sucesso.")
+    return historico_sorteios
+
+
+# =====================================================================
+# 3. INTERFACE DOS SUB-MODELOS DE IA
+# =====================================================================
+def gerar_palpite_frequencia(historico):
+    """Modelo 1: Seleciona as dezenas mais frequentes do histórico."""
+    # Substitua pela sua função real do Modelo de Frequência
+    return list(np.random.choice(range(1, 26), 15, replace=False))
+
+def gerar_palpite_atrasos(historico):
+    """Modelo 2: Analisa dezenas com maior ciclo de atraso."""
+    # Substitua pela sua função real do Modelo de Atrasos
+    return list(np.random.choice(range(1, 26), 15, replace=False))
+
+def gerar_palpite_padroes(historico):
+    """Modelo 3: Analisa equilíbrio de pares/Ímpares, primos e moldura."""
+    # Substitua pela sua função real do Modelo de Padrões
+    return list(np.random.choice(range(1, 26), 15, replace=False))
+
+
+# =====================================================================
+# 4. EXECUÇÃO DO WALK-FORWARD BACKTESTING
+# =====================================================================
+def executar_backtest(caminho_excel="Lotofacil.xlsx", inicio=3000, fim=3500):
+    banco_de_dados = extrair_dezenas_linha_caixa(caminho_excel)
+    curador = CuradorLotofacil(taxa_aprendizado=0.05)
     
-    pesos = probs / probs.sum()
-    ultimo_sorteio = extrair_dezenas_linha(df.iloc[-1].values) if df is not None and len(df) > 0 else None
-
-    jogos_validos = []
-    tentativas = 0
-    max_tentativas = count * 400
-
-    while len(jogos_validos) < count and tentativas < max_tentativas:
-        tentativas += 1
-        escolhidos = sorted([int(x) for x in np.random.choice(range(1, 26), size=15, replace=False, p=pesos)])
+    # Ajusta o limite se a planilha tiver menos concursos
+    fim = min(fim, len(banco_de_dados) - 1)
+    
+    print(f"\n🚀 Iniciando Walk-Forward Backtesting (Concursos {inicio} a {fim})...")
+    
+    for concurso_atual in range(inicio, fim + 1):
+        # 1. Evita Data Leakage (Treina apenas com os dados até o concurso anterior)
+        historico_disponivel = banco_de_dados[:concurso_atual]
+        sorteio_real = banco_de_dados[concurso_atual]
         
-        if e_jogo_valido(escolhidos, ultimo_sorteio):
-            if escolhidos not in jogos_validos:
-                jogos_validos.append(escolhidos)
-
-    while len(jogos_validos) < count:
-        escolhidos = sorted([int(x) for x in np.random.choice(range(1, 26), size=15, replace=False, p=pesos)])
-        if escolhidos not in jogos_validos:
-            jogos_validos.append(escolhidos)
-
-    return jogos_validos, ranking_ordenado
-
-
-# ---------------------------------------------------------
-# ENDPOINTS DA API (FASTAPI)
-# ---------------------------------------------------------
-
-class GenerateRequest(BaseModel):
-    session_id: Optional[str] = "sessao_oficial"
-    count: int = 5
-
-
-@app.get("/api/status")
-def get_status():
-    global dataframe_global, ultimo_concurso_global, session_id_global
-    
-    if dataframe_global is None:
-        carregar_base_e_modelo_inicial()
-        
-    return {
-        "session_id": session_id_global,
-        "last_draw": ultimo_concurso_global if ultimo_concurso_global else [],
-        "stats": {
-            "total_concursos": len(dataframe_global) if dataframe_global is not None else 0,
-            "ultimo_concurso": ultimo_numero_concurso
+        # 2. As IAs geram seus palpites
+        palpites_da_rodada = {
+            'Modelo_Frequencia': gerar_palpite_frequencia(historico_disponivel),
+            'Modelo_Atrasos': gerar_palpite_atrasos(historico_disponivel),
+            'Modelo_Padroes': gerar_palpite_padroes(historico_disponivel)
         }
-    }
-
-
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
-    global dataframe_global, ultimo_concurso_global, ultimo_numero_concurso
-    
-    try:
-        contents = await file.read()
-        if file.filename.endswith(".csv"):
-            df = pd.read_csv(io.BytesIO(contents))
-            df.to_csv(FILE_NAME_OFFICIAL, index=False)
-        else:
-            df = pd.read_excel(io.BytesIO(contents))
-            df.to_excel(FILE_NAME_OFFICIAL, index=False)
-
-        dataframe_global = df
         
-        ultima_linha = df.iloc[-1].values
-        ultimo_concurso_global = extrair_dezenas_linha(ultima_linha)
+        # 3. O Curador gera o Bilhete Final (Ensemble) antes do sorteio
+        bilhete_ensemble = curador.montar_bilhete_ensemble(palpites_da_rodada)
         
-        if "Concurso" in df.columns:
-            ultimo_numero_concurso = int(df["Concurso"].dropna().iloc[-1])
-        else:
-            ultimo_numero_concurso = len(df)
-
-        # Envia a nova planilha para o Supabase
-        enviar_para_supabase(FILE_NAME_OFFICIAL, FILE_NAME_OFFICIAL)
+        # 4. Sorteio acontece: Auditoria de acertos
+        acertos_ensemble = curador.avaliar_palpite(bilhete_ensemble, sorteio_real)
         
-        # Como a base mudou, apaga o modelo velho localmente e no Supabase 
-        # para forçar a IA a retreinar na próxima vez que gerar jogos
-        if os.path.exists(MODEL_FILE_NAME):
-            os.remove(MODEL_FILE_NAME)
+        acertos_modelos = {}
+        for modelo, palpite in palpites_da_rodada.items():
+            acertos_modelos[modelo] = curador.avaliar_palpite(palpite, sorteio_real)
+            
+        # 5. O 3º Curador recalibra os pesos para o próximo concurso
+        curador.recalibrar_pesos(acertos_modelos)
+        curador.registrar_historico(acertos_modelos, acertos_ensemble)
 
-        return {
-            "session_id": session_id_global,
-            "last_draw": ultimo_concurso_global,
-            "stats": {
-                "total_concursos": len(df),
-                "ultimo_concurso": ultimo_numero_concurso
-            }
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Erro ao processar arquivo: {str(e)}")
+        if (concurso_atual - inicio + 1) % 100 == 0 or concurso_atual == fim:
+            print(f"⏳ Processado concurso {concurso_atual}/{fim} | Média Ensemble: {np.mean(curador.historico_acertos_ensemble):.2f} pts")
 
+    # =====================================================================
+    # 5. DASHBOARD E RELATÓRIO FINAL
+    # =====================================================================
+    print("\n" + "="*50)
+    print("🏁 RESULTADO FINAL DO TREINAMENTO (CONCURSO " + str(fim) + ")")
+    print("="*50)
+    print("Pesos finais calibrados para o próximo jogo real:")
+    for modelo, peso in curador.pesos.items():
+        print(f" • {modelo}: {peso*100:.2f}% de relevância")
+        
+    print("\nDesempenho Médio no Backtest (500 jogos):")
+    print(f" 🎯 BILHETE ENSEMBLE (OFICIAL): {np.mean(curador.historico_acertos_ensemble):.2f} acertos/jogo")
+    for modelo, acertos in curador.historico_acertos_modelos.items():
+        print(f"   - {modelo}: {np.mean(acertos):.2f} acertos/jogo")
 
-@app.post("/api/generate")
-def generate_tickets(req: GenerateRequest):
-    jogos, ranking = gerar_jogos_ml_com_ranking(dataframe_global, count=req.count, is_backtest=False)
-    return {
-        "tickets": jogos,
-        "ranking": ranking
-    }
-
-
-@app.post("/api/backtest")
-async def run_backtest(
-    file: Optional[UploadFile] = File(None),
-    test_draws: int = Form(10),
-    bets_per_draw: int = Form(12),
-    session_id: Optional[str] = Form(None)
-):
-    global dataframe_global
+    # Plota o gráfico de evolução dos pesos
+    plt.figure(figsize=(12, 5))
+    for modelo, evolucao in curador.historico_pesos.items():
+        plt.plot(range(inicio, fim + 1), [p * 100 for p in evolucao], label=modelo, linewidth=2)
     
-    df = dataframe_global
-    if file is not None:
-        try:
-            contents = await file.read()
-            if file.filename.endswith(".csv"):
-                df = pd.read_csv(io.BytesIO(contents))
-            else:
-                df = pd.read_excel(io.BytesIO(contents))
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Erro ao processar planilha de backtest: {str(e)}")
-
-    if df is None or len(df) < 2:
-        raise HTTPException(status_code=400, detail="Base de dados insuficiente para executar o Backtest.")
-
-    total_concursos = len(df)
-    qtd_testes = min(test_draws, total_concursos - 1)
-    
-    placar = {"11": 0, "12": 0, "13": 0, "14": 0, "15": 0}
-    total_apostas = 0
-
-    inicio_idx = total_concursos - qtd_testes
-
-    for i in range(inicio_idx, total_concursos):
-        df_historico_passado = df.iloc[:i]
-        resultado_real = set(extrair_dezenas_linha(df.iloc[i].values))
-
-        if len(resultado_real) < 15:
-            continue
-
-        # Passamos is_backtest=True para não gravar o modelo de simulação no Supabase
-        bilhetes_gerados, _ = gerar_jogos_ml_com_ranking(df_historico_passado, count=bets_per_draw, is_backtest=True)
-        total_apostas += len(bilhetes_gerados)
-
-        for bilhete in bilhetes_gerados:
-            acertos = len(set(bilhete).intersection(resultado_real))
-            if acertos >= 11:
-                chave = str(acertos)
-                if chave in placar:
-                    placar[chave] += 1
-
-    resumo = {
-        "total_apostas": total_apostas,
-        "11": placar["11"],
-        "12": placar["12"],
-        "13": placar["13"],
-        "14": placar["14"],
-        "15": placar["15"]
-    }
-
-    return {"resumo": resumo}
-
+    plt.title("Evolução dos Pesos de Confiança (3º Curador) - Walk-Forward", fontsize=12)
+    plt.xlabel("Concursos da Lotofácil")
+    plt.ylabel("Peso de Confiança (%)")
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    executar_backtest(caminho_excel="Lotofacil.xlsx", inicio=3000, fim=3500)
