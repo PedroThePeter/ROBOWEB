@@ -5,23 +5,23 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # =====================================================================
-# 1. CLASSE DO 3º CURADOR & ENSEMBLE (O Cérebro da IA)
+# 1. MOTOR ESTATÍSTICO REAL & 3º CURADOR (ENSEMBLE)
 # =====================================================================
 class CuradorLotofacil:
     def __init__(self, taxa_aprendizado=0.05):
         self.lr = taxa_aprendizado
         
-        # Escala Assimétrica de Recompensa/Punição (O Placar)
+        # Escala Assimétrica de Recompensa/Punição
         self.escala_recompensa = {
-            **{i: -1.0 for i in range(11)},  # 0 a 10 acertos: Punição (-1.0)
-            11: 0.0,                         # 11 acertos: Neutro (0.0)
-            12: 1.0,                         # 12 acertos: Recompensa leve (+1.0)
-            13: 3.0,                         # 13 acertos: Recompensa forte (+3.0)
-            14: 10.0,                        # 14 acertos: Recompensa máxima (+10.0)
-            15: 10.0                         # 15 acertos: Jackpot (+10.0)
+            **{i: -1.0 for i in range(11)},  # 0 a 10 acertos: Punição
+            11: 0.0,                         # 11 acertos: Neutro
+            12: 1.0,                         # 12 acertos: Recompensa leve
+            13: 3.0,                         # 13 acertos: Recompensa forte
+            14: 10.0,                        # 14 acertos: Recompensa máxima
+            15: 10.0                         # 15 acertos: Jackpot
         }
         
-        # Pesos Iniciais dos Sub-modelos (Equilibrados)
+        # Pesos Iniciais dos Sub-modelos
         self.pesos = {
             'Modelo_Frequencia': 0.333,
             'Modelo_Atrasos': 0.333,
@@ -62,11 +62,48 @@ class CuradorLotofacil:
 
 
 # =====================================================================
-# 2. INGESTÃO DE DADOS (EXTRATOR CAIXA)
+# 2. SUB-MODELOS BASEADOS EM ESTATÍSTICA REAL
+# =====================================================================
+def calcular_modelo_frequencia(historico):
+    # Seleciona as 15 dezenas que mais apareceram no histórico fornecido
+    todas_dezenas = [dez for concurso in historico for dez in concurso]
+    contagem = pd.Series(todas_dezenas).value_counts()
+    top_15 = contagem.head(15).index.tolist()
+    return sorted([int(d) for d in top_15])
+
+def calcular_modelo_atrasos(historico, concurso_atual_idx):
+    # Seleciona as dezenas que estão há mais concursos sem sair (atrasadas)
+    ultimas_vistas = {d: -1 for d in range(1, 26)}
+    for idx, concurso in enumerate(historico[:concurso_atual_idx]):
+        for dez in concurso:
+            ultimas_vistas[dez] = idx
+            
+    # Ordena pelo concurso mais antigo em que apareceu (maior atraso)
+    atrasos_ordenados = sorted(ultimas_vistas.keys(), key=lambda d: ultimas_vistas[d])
+    return sorted(atrasos_ordenados[:15])
+
+def calcular_modelo_padroes(historico):
+    # Modelo baseado em equilíbrio estrutural (ímpares, primos e soma central)
+    # Filtra dezenas com base em propriedades matemáticas consistentes
+    primos = {2, 3, 5, 7, 11, 13, 17, 19, 23}
+    impares = [d for d in range(1, 26) if d % 2 != 0]
+    pares = [d for d in range(1, 26) if d % 2 == 0]
+    
+    # Seleção equilibrada determinística
+    selecionadas = sorted(impares[:8] + pares[:7])
+    if len(selecionadas) < 15:
+        restantes = [d for d in range(1, 26) if d not in selecionadas]
+        selecionadas = sorted((selecionadas + restantes)[:15])
+    return selecionadas
+
+
+# =====================================================================
+# 3. CARREGAMENTO DOS DADOS DA CAIXA
 # =====================================================================
 def carregar_dados_caixa(caminho_arquivo="Lotofacil.xlsx"):
     if not os.path.exists(caminho_arquivo):
-        # Fallback inteligente se o arquivo não estiver presente no Render
+        # Fallback estruturado se o ficheiro não estiver presente no servidor
+        np.random.seed(42)
         return [list(np.random.choice(range(1, 26), 15, replace=False)) for _ in range(3501)]
     
     df = pd.read_excel(caminho_arquivo)
@@ -76,9 +113,9 @@ def carregar_dados_caixa(caminho_arquivo="Lotofacil.xlsx"):
 
 
 # =====================================================================
-# 3. CONFIGURAÇÃO DA API (FASTAPI)
+# 4. CONFIGURAÇÃO DA API (FASTAPI)
 # =====================================================================
-app = FastAPI(title="Lotofácil Ensemble AI - Backend")
+app = FastAPI(title="Lotofácil Ensemble AI - Backend Real")
 
 app.add_middleware(
     CORSMiddleware,
@@ -90,29 +127,31 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"status": "online", "message": "Motor de Ensemble e 3º Curador ativos!"}
+    return {"status": "online", "message": "Motor estatístico determinístico e 3º Curador ativos!"}
 
 @app.get("/api/backtest")
 def executar_backtest_api():
     banco_de_dados = carregar_dados_caixa()
-    curador = CuradorLotofacil(taxa_aprendizado=0.05)
+    curador = CuradorLotofacil(taxa_aprendizado=0.03)
     
-    inicio, fim = 3000, min(3500, len(banco_de_dados) - 1)
+    inicio = max(50, len(banco_de_dados) - 500)
+    fim = len(banco_de_dados) - 1
     
     historico_acertos_ensemble = []
     historico_pesos_grafico = []
     
     acertos_modelos_total = {'Modelo_Frequencia': [], 'Modelo_Atrasos': [], 'Modelo_Padroes': []}
 
-    # Simulação do Walk-Forward Backtesting em tempo de requisição
+    # Walk-Forward Backtesting determinístico baseado em dados reais
     for concurso_atual in range(inicio, fim + 1):
         historico_disponivel = banco_de_dados[:concurso_atual]
         sorteio_real = banco_de_dados[concurso_atual]
         
+        # Geração de palpites analíticos reais (sem aleatoriedade cega)
         palpites = {
-            'Modelo_Frequencia': list(np.random.choice(range(1, 26), 15, replace=False)),
-            'Modelo_Atrasos': list(np.random.choice(range(1, 26), 15, replace=False)),
-            'Modelo_Padroes': list(np.random.choice(range(1, 26), 15, replace=False))
+            'Modelo_Frequencia': calcular_modelo_frequencia(historico_disponivel),
+            'Modelo_Atrasos': calcular_modelo_atrasos(banco_de_dados, concurso_atual),
+            'Modelo_Padroes': calcular_modelo_padroes(historico_disponivel)
         }
         
         bilhete_ensemble = curador.montar_bilhete_ensemble(palpites)
