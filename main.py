@@ -134,7 +134,7 @@ def executar_backtest_api():
     banco_de_dados = carregar_dados_caixa()
     curador = CuradorLotofacil(taxa_aprendizado=0.03)
     
-    inicio = max(50, len(banco_de_dados) - 500)
+    inicio = max(50, len(banco_de_dados) - 1500)
     fim = len(banco_de_dados) - 1
     
     historico_acertos_ensemble = []
