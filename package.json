@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "lucide-react": "^1.47.0",
+    "react-hot-toast": "^2.6.1",
     "recharts": "^3.10.1"
   }
 }
