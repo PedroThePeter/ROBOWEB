@@ -72,42 +72,32 @@ export default function App() {
     }
   };
 
-  // Gera os palpites dos 3 Curadores e grava no Supabase
+  // Gera os palpites dinâmicos via Backend/Python e grava no Supabase
   const gerarPalpiteDoDia = async () => {
     setIsGerando(true);
     try {
-      const novosPalpites = {
-        curador1: [1, 2, 4, 5, 8, 9, 11, 13, 14, 18, 20, 21, 22, 24, 25],
-        curador2: [2, 3, 4, 6, 8, 9, 10, 13, 15, 17, 19, 20, 23, 24, 25],
-        curador3: [1, 3, 4, 7, 8, 10, 11, 13, 14, 17, 18, 20, 22, 24, 25]
-      };
-
-      setPalpites(novosPalpites);
-
-      // Envia os bilhetes para persistência no Supabase
-      const payload = {
-        concurso_alvo: Number(concursoAlvo),
-        bilhetes: [
-          { curador: "1º Curador (Voto Simples)", dezenas: novosPalpites.curador1 },
-          { curador: "2º Curador (Pesos Históricos)", dezenas: novosPalpites.curador2 },
-          { curador: "3º Curador (Assimétrico)", dezenas: novosPalpites.curador3 }
-        ]
-      };
-
-      const res = await fetch(`${API_URL}/api/salvar_bilhetes`, {
+      // Solicita a geração dinâmica de palpites ao backend
+      const res = await fetch(`${API_URL}/api/gerar_palpites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ concurso_alvo: Number(concursoAlvo) })
       });
 
-      if (res.ok) {
-        showToast(`Bilhetes do Concurso ${concursoAlvo} gravados no Supabase!`, 'success');
+      if (!res.ok) throw new Error('Erro ao obter palpites do backend.');
+
+      const data = await res.json();
+      
+      // Atualiza o estado com as sequências geradas pelo backend
+      if (data.palpites) {
+        setPalpites(data.palpites);
       } else {
-        showToast('Palpites gerados na tela, mas houve um aviso ao gravar no Supabase.', 'info');
+        setPalpites(data);
       }
+
+      showToast(`Novos palpites dinâmicos do Concurso ${concursoAlvo} gerados e salvos!`, 'success');
     } catch (error) {
-      console.error('Erro:', error);
-      showToast('Erro de conexão ao salvar palpites no servidor.', 'error');
+      console.error('Erro ao gerar palpites:', error);
+      showToast('Erro ao conectar ao backend para gerar novos palpites.', 'error');
     } finally {
       setIsGerando(false);
     }
@@ -131,7 +121,7 @@ export default function App() {
       }
     } catch (error) {
       console.error('Erro na auditoria:', error);
-      showToast('Falha de conexão com o servidor ao auditar.', 'error');
+      showToast('Falha de comunicação com o servidor ao auditar.', 'error');
     } finally {
       setIsAuditando(false);
     }
@@ -211,7 +201,7 @@ export default function App() {
             </label>
           </div>
 
-          {/* Caixa 2: Gerador de Bilhetes */}
+          {/* Caixa 2: Gerador de Bilhetes Dinâmicos */}
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl flex flex-col justify-between">
             <div>
               <h2 className="text-lg font-bold text-white flex items-center gap-2 mb-2">
@@ -292,7 +282,7 @@ export default function App() {
                 <Scale size={18}/> 1º Curador (Voto Simples)
               </h3>
               <div className="flex flex-wrap gap-2 justify-center">
-                {palpites.curador1.map(d => (
+                {palpites.curador1?.map(d => (
                   <div key={d} className="w-9 h-9 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300 border border-slate-700">
                     {String(d).padStart(2,'0')}
                   </div>
@@ -306,7 +296,7 @@ export default function App() {
                 <ShieldAlert size={18}/> 2º Curador (Pesos Históricos)
               </h3>
               <div className="flex flex-wrap gap-2 justify-center">
-                {palpites.curador2.map(d => (
+                {palpites.curador2?.map(d => (
                   <div key={d} className="w-9 h-9 rounded-lg bg-blue-950/50 border border-blue-800/50 flex items-center justify-center text-xs font-bold text-blue-300">
                     {String(d).padStart(2,'0')}
                   </div>
@@ -321,7 +311,7 @@ export default function App() {
                 <Award size={18}/> 3º Curador (Assimétrico)
               </h3>
               <div className="flex flex-wrap gap-2 justify-center">
-                {palpites.curador3.map(d => (
+                {palpites.curador3?.map(d => (
                   <div key={d} className="w-9 h-9 rounded-lg bg-emerald-900/80 border border-emerald-500/50 flex items-center justify-center text-xs font-bold text-white shadow-md shadow-emerald-900/50">
                     {String(d).padStart(2,'0')}
                   </div>
