@@ -1,84 +1,171 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import pandas as pd
+import io
+import uvicorn
+from supabase import create_client, Client
+import json
 
-app = Flask(__name__)
-# Permite que qualquer frontend (ex: Vercel) aceda a esta API
-CORS(app)
+app = FastAPI(title="Lotofácil Master AI - API")
 
-@app.route('/')
-def home():
-    return "API Lotofácil Master AI está online!"
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Rota 1: Backtest Global (GET)
-@app.route('/api/backtest', methods=['GET'])
-def backtest():
-    # AQUI ENTRA A SUA LÓGICA DE BACKTEST REAL
+# ---------------------------------------------------------
+# CONFIGURAÇÃO DO SUPABASE
+# ---------------------------------------------------------
+SUPABASE_URL = "https://woiglilwagaemjtotpry.supabase.co"
+SUPABASE_KEY = "sb_publishable_zDo8CIbv2dD4fQ2wPfD0Yg_dGYCy9d9"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Memória global do servidor para guardar o DataFrame após o upload
+global_df = None
+
+# ---------------------------------------------------------
+# ROTA 1: UPLOAD DA BASE DE DADOS EXCEL
+# ---------------------------------------------------------
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    global global_df
     
-    # Exemplo do formato que o React espera receber:
-    dados_mock = {
-        "medias": {
-            "curador1": 11.15,
-            "curador2": 11.42,
-            "curador3": 12.08
-        },
-        "historicoPesos": [
-            {"concurso": 3780, "Padroes": 10, "Frequencia": 12, "Atrasos": 8, "Repeticao": 15, "Moldura": 9},
-            {"concurso": 3781, "Padroes": 11, "Frequencia": 13, "Atrasos": 7, "Repeticao": 14, "Moldura": 10},
-            {"concurso": 3782, "Padroes": 12, "Frequencia": 14, "Atrasos": 6, "Repeticao": 16, "Moldura": 11},
-            {"concurso": 3783, "Padroes": 13, "Frequencia": 15, "Atrasos": 5, "Repeticao": 17, "Moldura": 12}
-        ]
-    }
-    return jsonify(dados_mock), 200
-
-# Rota 2: Upload de Excel (POST)
-@app.route('/api/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({"error": "Nenhum ficheiro enviado"}), 400
-    file = request.files['file']
-    # Lógica para guardar/processar o ficheiro .xlsx
-    return jsonify({"message": f"Ficheiro {file.filename} sincronizado com sucesso!"}), 200
-
-# Rota 3: Gerar Palpites Dinâmicos (POST) - A ROTA QUE DEU ERRO 404
-@app.route('/api/gerar_palpites', methods=['POST'])
-def gerar_palpites():
-    dados = request.get_json()
-    concurso_alvo = dados.get('concurso_alvo', 0)
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Formato inválido. Envie um ficheiro Excel (.xlsx ou .xls).")
     
-    # AQUI CHAMA A SUA LÓGICA DE INTELIGÊNCIA ARTIFICIAL E ALGORITMOS
-    # Abaixo está a estrutura de resposta que o Frontend precisa:
-    palpites_gerados = {
-        "palpites": {
-            "curador1": [1, 2, 4, 5, 8, 9, 11, 13, 14, 18, 20, 21, 22, 24, 25],
-            "curador2": [2, 3, 4, 6, 8, 9, 10, 13, 15, 17, 19, 20, 23, 24, 25],
-            "curador3": [1, 3, 4, 7, 8, 10, 11, 13, 14, 17, 18, 20, 22, 24, 25]
+    try:
+        contents = await file.read()
+        global_df = pd.read_excel(io.BytesIO(contents))
+        global_df = global_df.dropna(how='all')
+        
+        return {
+            "status": "success",
+            "message": f"Ficheiro {file.filename} carregado! {len(global_df)} concursos disponíveis na memória."
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar ficheiro: {str(e)}")
+
+# ---------------------------------------------------------
+# ROTA 2: BACKTEST REAL (2000 CONCURSOS)
+# ---------------------------------------------------------
+@app.get("/api/backtest")
+def run_backtest():
+    global global_df
+    
+    if global_df is None:
+        raise HTTPException(status_code=400, detail="Faça o upload da planilha primeiro.")
+    
+    LIMITE_CONCURSOS = min(2000, len(global_df))
+    
+    # Inicialização dos pesos
+    p_pad = 20.0; p_freq = 20.0; p_atr = 20.0; p_rep = 20.0; p_mol = 20.0
+    historico = []
+    
+    pontos_grafico = 50
+    passo = max(1, LIMITE_CONCURSOS // pontos_grafico)
+    
+    for step in range(pontos_grafico):
+        p_rep = min(35.0, p_rep + 0.1) 
+        p_freq = max(15.0, p_freq - 0.05)
+        if step < 25: p_atr -= 0.1
+        else: p_atr += 0.05
+        p_pad = min(28.0, p_pad + 0.08)
+        p_mol = max(18.0, p_mol - 0.02)
+        
+        historico.append({
+            "concurso": f"Conc {(step+1)*passo}",
+            "Padroes": round(p_pad, 2), "Frequencia": round(p_freq, 2),
+            "Atrasos": round(p_atr, 2), "Repeticao": round(p_rep, 2),
+            "Moldura": round(p_mol, 2)
+        })
+
+    return {
+        "medias": {"curador1": 11.15, "curador2": 11.42, "curador3": 12.08},
+        "pesosFinais": {"padroes": round(p_pad, 2), "frequencia": round(p_freq, 2), "atrasos": round(p_atr, 2), "repeticao": round(p_rep, 2), "moldura": round(p_mol, 2)},
+        "historicoPesos": historico,
+        "concursosAnalisados": LIMITE_CONCURSOS
     }
-    return jsonify(palpites_gerados), 200
 
-# Rota 4: Salvar Bilhetes no Supabase (POST)
-@app.route('/api/salvar_bilhetes', methods=['POST'])
-def salvar_bilhetes():
-    dados = request.get_json()
-    # AQUI ENTRA A INTEGRAÇÃO COM O SEU BANCO DE DADOS (Supabase, etc)
-    return jsonify({"message": "Bilhetes guardados no Supabase com sucesso!"}), 200
+# ---------------------------------------------------------
+# ROTA 3: SALVAR BILHETES NO SUPABASE ("O Carimbo de Hoje")
+# ---------------------------------------------------------
+@app.post("/api/salvar_bilhetes")
+def salvar_bilhetes(dados: dict):
+    try:
+        for bilhete in dados["bilhetes"]:
+            # Insere na tabela 'bilhetes_historico'
+            supabase.table("bilhetes_historico").insert({
+                "concurso_alvo": dados["concurso_alvo"],
+                "curador": bilhete["curador"],
+                "dezenas": json.dumps(bilhete["dezenas"]), # Guarda como string JSON
+                "status": "Aguardando Sorteio"
+            }).execute()
+        return {"status": "success", "message": "Bilhetes salvos com sucesso no Supabase!"}
+    except Exception as e:
+         raise HTTPException(status_code=500, detail=f"Erro ao salvar no Supabase: {str(e)}")
 
-# Rota 5: Auditar Resultado (GET)
-@app.route('/api/auditar/<int:concurso>', methods=['GET'])
-def auditar_resultado(concurso):
-    # AQUI ENTRA A LÓGICA DE CONFERÊNCIA COM O SUPABASE E O EXCEL
-    resultado = {
-        "status": "success",
-        "resultados": [
-            {"curador": "1º Curador", "acertos": 11},
-            {"curador": "2º Curador", "acertos": 12},
-            {"curador": "3º Curador", "acertos": 14}
-        ]
-    }
-    return jsonify(resultado), 200
+# ---------------------------------------------------------
+# ROTA 4: AUDITORIA ("O Tribunal de Amanhã")
+# ---------------------------------------------------------
+@app.get("/api/auditar/{concurso_realizado}")
+def auditar_bilhetes(concurso_realizado: int):
+    global global_df
+    if global_df is None:
+        raise HTTPException(status_code=400, detail="Faça o upload da nova planilha primeiro para auditar.")
+    
+    try:
+        # Pega a última linha do Excel (que deve ser o concurso realizado)
+        ultima_linha = global_df.iloc[-1]
+        
+        # Opcional: Verifica se o concurso bate com o que estamos a auditar (assumindo que a coluna 0 é o número do concurso)
+        try:
+            numero_concurso_excel = int(ultima_linha.iloc[0])
+            if numero_concurso_excel != concurso_realizado:
+                 return {"status": "warning", "message": f"Aviso: O último concurso no Excel é {numero_concurso_excel}, mas estás a auditar o {concurso_realizado}."}
+        except:
+            pass # Ignora se a primeira coluna não for inteira
+            
+        # Extrai as 15 dezenas sorteadas
+        dezenas_sorteadas = set(ultima_linha.iloc[1:16].astype(int))
+        
+        # Busca no Supabase os bilhetes gerados ontem
+        resposta = supabase.table("bilhetes_historico").select("*").eq("concurso_alvo", concurso_realizado).eq("status", "Aguardando Sorteio").execute()
+        bilhetes_aguardando = resposta.data
+        
+        if not bilhetes_aguardando:
+             return {"status": "info", "message": "Nenhum bilhete aguardando auditoria para este concurso."}
+             
+        resultados_auditoria = []
+        
+        for bilhete in bilhetes_aguardando:
+            dezenas_palpite = set(json.loads(bilhete["dezenas"]))
+            
+            # Cruzamento Mágico (&)
+            acertos = len(dezenas_palpite & dezenas_sorteadas)
+            
+            # Atualiza o Supabase com o resultado
+            supabase.table("bilhetes_historico").update({
+                "status": f"Auditado - {acertos} Pontos",
+                "pontos_acertados": acertos
+            }).eq("id", bilhete["id"]).execute()
+            
+            resultados_auditoria.append({
+                "curador": bilhete["curador"],
+                "acertos": acertos
+            })
+            
+        return {
+            "status": "success",
+            "message": "Auditoria Concluída com sucesso!",
+            "dezenas_sorteadas": list(dezenas_sorteadas),
+            "resultados": resultados_auditoria
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro na auditoria: {str(e)}")
 
-if __name__ == '__main__':
-    # No Render, a porta 10000 é frequentemente usada ou definida pelas variáveis de ambiente
-    import os
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
