@@ -1,6 +1,7 @@
-fastapi
-uvicorn
-python-multipart
-pandas
-openpyxl
-supabase
+Flask==3.0.2
+Flask-Cors==4.0.0
+pandas==2.2.1
+numpy==1.26.4
+openpyxl==3.1.2
+gunicorn==21.2.0
+supabase==2.3.0

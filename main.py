@@ -1,171 +1,182 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+import os
+import glob
 import pandas as pd
-import io
-import uvicorn
+from flask import Flask, jsonify, request
+from flask_cors import CORS
 from supabase import create_client, Client
-import json
+from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
-app = FastAPI(title="Lotofácil Master AI - API")
+app = Flask(__name__)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# --- CONFIGURAÇÃO DE SEGURANÇA E CORS ---
+URL_FRONTEND = os.environ.get("URL_FRONTEND", "https://seu-projeto.vercel.app")
+CORS(app, resources={r"/api/*": {"origins": URL_FRONTEND}})
 
-# ---------------------------------------------------------
-# CONFIGURAÇÃO DO SUPABASE
-# ---------------------------------------------------------
-SUPABASE_URL = "https://woiglilwagaemjtotpry.supabase.co"
-SUPABASE_KEY = "sb_publishable_zDo8CIbv2dD4fQ2wPfD0Yg_dGYCy9d9"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Memória global do servidor para guardar o DataFrame após o upload
-global_df = None
+# --- CONFIGURAÇÃO SUPABASE ---
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
-# ---------------------------------------------------------
-# ROTA 1: UPLOAD DA BASE DE DADOS EXCEL
-# ---------------------------------------------------------
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
-    global global_df
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+@app.route('/')
+def home():
+    return jsonify({"status": "online", "message": "Lotofácil Master AI Backend a funcionar!"})
+
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"error": "Nenhum ficheiro enviado"}), 400
     
-    if not file.filename.endswith(('.xlsx', '.xls')):
-        raise HTTPException(status_code=400, detail="Formato inválido. Envie um ficheiro Excel (.xlsx ou .xls).")
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "Nome de ficheiro inválido"}), 400
+    
+    filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(filepath)
     
     try:
-        contents = await file.read()
-        global_df = pd.read_excel(io.BytesIO(contents))
-        global_df = global_df.dropna(how='all')
-        
-        return {
-            "status": "success",
-            "message": f"Ficheiro {file.filename} carregado! {len(global_df)} concursos disponíveis na memória."
-        }
+        df = pd.read_excel(filepath)
+        total_linhas = len(df)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao processar ficheiro: {str(e)}")
+        return jsonify({"error": f"Erro ao ler Excel: {str(e)}"}), 500
 
-# ---------------------------------------------------------
-# ROTA 2: BACKTEST REAL (2000 CONCURSOS)
-# ---------------------------------------------------------
-@app.get("/api/backtest")
-def run_backtest():
-    global global_df
+    return jsonify({
+        "message": "Base atualizada com sucesso!",
+        "filename": file.filename,
+        "total_concursos": total_linhas
+    })
+
+@app.route('/api/gerar_palpites', methods=['POST'])
+def gerar_palpites():
+    dados = request.get_json() or {}
+    concurso_alvo = dados.get('concurso_alvo', 0)
     
-    if global_df is None:
-        raise HTTPException(status_code=400, detail="Faça o upload da planilha primeiro.")
+    arquivos_excel = glob.glob(os.path.join(UPLOAD_FOLDER, '*.xlsx'))
+    if not arquivos_excel:
+        return jsonify({"error": "Base de dados não encontrada. Faça upload do Excel."}), 400
     
-    LIMITE_CONCURSOS = min(2000, len(global_df))
-    
-    # Inicialização dos pesos
-    p_pad = 20.0; p_freq = 20.0; p_atr = 20.0; p_rep = 20.0; p_mol = 20.0
-    historico = []
-    
-    pontos_grafico = 50
-    passo = max(1, LIMITE_CONCURSOS // pontos_grafico)
-    
-    for step in range(pontos_grafico):
-        p_rep = min(35.0, p_rep + 0.1) 
-        p_freq = max(15.0, p_freq - 0.05)
-        if step < 25: p_atr -= 0.1
-        else: p_atr += 0.05
-        p_pad = min(28.0, p_pad + 0.08)
-        p_mol = max(18.0, p_mol - 0.02)
+    try:
+        df = pd.read_excel(arquivos_excel[0])
         
-        historico.append({
-            "concurso": f"Conc {(step+1)*passo}",
-            "Padroes": round(p_pad, 2), "Frequencia": round(p_freq, 2),
-            "Atrasos": round(p_atr, 2), "Repeticao": round(p_rep, 2),
-            "Moldura": round(p_mol, 2)
+        motor = LotofacilEngine(df)
+        stats_frequencia = motor.juiz_de_frequencia(janela=20)
+        stats_ciclos = motor.juiz_de_padroes_e_ciclos()
+        stats_paridade = motor.juiz_de_paridade_e_primos()
+        stats_soma = motor.juiz_de_soma_e_amplitude()
+        stats_sequencias = motor.juiz_de_sequencias_e_repeticoes()
+
+        validador = CuradorDeValidacao(
+            stats_ciclos, stats_paridade, stats_soma, stats_sequencias
+        )
+        
+        gerador = CuradorDeSelecaoFinal(
+            validador, stats_frequencia, stats_ciclos, stats_sequencias
+        )
+
+        resultado_geracao = gerador.gerar_bilhetes_diamante(quantidade=3)
+
+        if len(resultado_geracao["bilhetes"]) == 0:
+            return jsonify({"error": "Filtros demasiado restritos. Nenhum bilhete sobreviveu ao Validador."}), 500
+
+        palpites_finais = {
+            f"curador{i+1}": bilhete 
+            for i, bilhete in enumerate(resultado_geracao["bilhetes"])
+        }
+
+        return jsonify({
+            "status": "sucesso",
+            "palpites": palpites_finais,
+            "concurso": concurso_alvo,
+            "metricas_ia": {
+                "tentativas_processadas": resultado_geracao["tentativas_gastas"],
+                "taxa_aprovacao_validador": resultado_geracao["eficiencia"]
+            }
         })
 
-    return {
-        "medias": {"curador1": 11.15, "curador2": 11.42, "curador3": 12.08},
-        "pesosFinais": {"padroes": round(p_pad, 2), "frequencia": round(p_freq, 2), "atrasos": round(p_atr, 2), "repeticao": round(p_rep, 2), "moldura": round(p_mol, 2)},
-        "historicoPesos": historico,
-        "concursosAnalisados": LIMITE_CONCURSOS
-    }
-
-# ---------------------------------------------------------
-# ROTA 3: SALVAR BILHETES NO SUPABASE ("O Carimbo de Hoje")
-# ---------------------------------------------------------
-@app.post("/api/salvar_bilhetes")
-def salvar_bilhetes(dados: dict):
-    try:
-        for bilhete in dados["bilhetes"]:
-            # Insere na tabela 'bilhetes_historico'
-            supabase.table("bilhetes_historico").insert({
-                "concurso_alvo": dados["concurso_alvo"],
-                "curador": bilhete["curador"],
-                "dezenas": json.dumps(bilhete["dezenas"]), # Guarda como string JSON
-                "status": "Aguardando Sorteio"
-            }).execute()
-        return {"status": "success", "message": "Bilhetes salvos com sucesso no Supabase!"}
     except Exception as e:
-         raise HTTPException(status_code=500, detail=f"Erro ao salvar no Supabase: {str(e)}")
+        return jsonify({"error": f"Erro interno do Motor AI: {str(e)}"}), 500
 
-# ---------------------------------------------------------
-# ROTA 4: AUDITORIA ("O Tribunal de Amanhã")
-# ---------------------------------------------------------
-@app.get("/api/auditar/{concurso_realizado}")
-def auditar_bilhetes(concurso_realizado: int):
-    global global_df
-    if global_df is None:
-        raise HTTPException(status_code=400, detail="Faça o upload da nova planilha primeiro para auditar.")
+@app.route('/api/salvar_bilhetes', methods=['POST'])
+def salvar_bilhetes():
+    if not supabase:
+        return jsonify({"error": "Supabase não está configurado."}), 500
+        
+    dados = request.json or {}
+    concurso = dados.get("concurso")
+    palpites = dados.get("palpites", {})
+    
+    if not concurso or not palpites:
+        return jsonify({"error": "Dados incompletos para salvar."}), 400
+
+    registros = [
+        {"concurso": concurso, "curador": curador, "dezenas": dezenas}
+        for curador, dezenas in palpites.items()
+    ]
     
     try:
-        # Pega a última linha do Excel (que deve ser o concurso realizado)
-        ultima_linha = global_df.iloc[-1]
+        supabase.table("bilhetes_gerados").insert(registros).execute()
+        return jsonify({"status": "sucesso", "mensagem": f"Bilhetes do concurso {concurso} salvos!"})
+    except Exception as e:
+        return jsonify({"error": f"Erro ao salvar no banco: {str(e)}"}), 500
+
+@app.route('/api/auditar/<int:concurso_alvo>', methods=['GET'])
+def auditar_resultado(concurso_alvo):
+    if not supabase:
+        return jsonify({"error": "Supabase não configurado."}), 500
         
-        # Opcional: Verifica se o concurso bate com o que estamos a auditar (assumindo que a coluna 0 é o número do concurso)
-        try:
-            numero_concurso_excel = int(ultima_linha.iloc[0])
-            if numero_concurso_excel != concurso_realizado:
-                 return {"status": "warning", "message": f"Aviso: O último concurso no Excel é {numero_concurso_excel}, mas estás a auditar o {concurso_realizado}."}
-        except:
-            pass # Ignora se a primeira coluna não for inteira
+    try:
+        res_db = supabase.table("bilhetes_gerados").select("*").eq("concurso", concurso_alvo).execute()
+        bilhetes_salvos = res_db.data
+        
+        if not bilhetes_salvos:
+            return jsonify({"error": f"Nenhum palpite salvo para o concurso {concurso_alvo}."}), 404
+
+        arquivos_excel = glob.glob(os.path.join(UPLOAD_FOLDER, '*.xlsx'))
+        if not arquivos_excel:
+            return jsonify({"error": "Base de dados Excel não encontrada."}), 400
             
-        # Extrai as 15 dezenas sorteadas
-        dezenas_sorteadas = set(ultima_linha.iloc[1:16].astype(int))
+        df = pd.read_excel(arquivos_excel[0])
         
-        # Busca no Supabase os bilhetes gerados ontem
-        resposta = supabase.table("bilhetes_historico").select("*").eq("concurso_alvo", concurso_realizado).eq("status", "Aguardando Sorteio").execute()
-        bilhetes_aguardando = resposta.data
-        
-        if not bilhetes_aguardando:
-             return {"status": "info", "message": "Nenhum bilhete aguardando auditoria para este concurso."}
-             
+        col_concurso = [c for c in df.columns if str(c).strip().lower() == 'concurso']
+        if not col_concurso:
+            return jsonify({"error": "Coluna 'Concurso' não encontrada no Excel."}), 400
+            
+        linha_resultado = df[df[col_concurso[0]] == concurso_alvo]
+        if linha_resultado.empty:
+            return jsonify({"error": f"O resultado do concurso {concurso_alvo} ainda não existe no Excel."}), 404
+            
+        colunas_dezenas = [col for col in df.columns if 'Bola' in str(col) or 'Dezena' in str(col)]
+        if not colunas_dezenas or len(colunas_dezenas) != 15:
+            colunas_dezenas = df.columns[-15:]
+            
+        dezenas_sorteadas = set(linha_resultado.iloc[0][colunas_dezenas].astype(int).tolist())
+
         resultados_auditoria = []
-        
-        for bilhete in bilhetes_aguardando:
-            dezenas_palpite = set(json.loads(bilhete["dezenas"]))
-            
-            # Cruzamento Mágico (&)
-            acertos = len(dezenas_palpite & dezenas_sorteadas)
-            
-            # Atualiza o Supabase com o resultado
-            supabase.table("bilhetes_historico").update({
-                "status": f"Auditado - {acertos} Pontos",
-                "pontos_acertados": acertos
-            }).eq("id", bilhete["id"]).execute()
+        for bilhete in bilhetes_salvos:
+            dezenas_apostadas = set(bilhete['dezenas'])
+            acertos = len(dezenas_sorteadas.intersection(dezenas_apostadas))
             
             resultados_auditoria.append({
-                "curador": bilhete["curador"],
-                "acertos": acertos
+                "curador": bilhete['curador'],
+                "acertos": acertos,
+                "dezenas_sorteadas": list(dezenas_sorteadas),
+                "dezenas_apostadas": list(dezenas_apostadas)
             })
             
-        return {
-            "status": "success",
-            "message": "Auditoria Concluída com sucesso!",
-            "dezenas_sorteadas": list(dezenas_sorteadas),
+        return jsonify({
+            "status": "sucesso",
+            "concurso": concurso_alvo,
             "resultados": resultados_auditoria
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro na auditoria: {str(e)}")
+        })
 
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    except Exception as e:
+        return jsonify({"error": f"Erro na auditoria: {str(e)}"}), 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
