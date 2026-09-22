@@ -4,9 +4,4 @@ pandas==2.2.1
 numpy==1.26.4
 openpyxl==3.1.2
 gunicorn==21.2.0
-
-# --- Fix para o bug do Supabase (gotrue proxy) ---
-httpx==0.24.1
-gotrue==2.3.1
-postgrest==0.16.2
-supabase==2.3.4
+supabase==2.3.0
