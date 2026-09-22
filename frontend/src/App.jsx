@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
-// ==========================================================
-// CONFIGURAÇÃO DE URLS DE ENDPOINT DA API
-// ==========================================================
-// Se houver uma variável de ambiente VITE_API_URL, ela é usada.
-// Caso contrário, assume o endereço local http://localhost:5000/api
-const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:5000/api';
+// Tratamento flexível do endereço base da API
+const RAW_URL = import.meta.env?.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = RAW_URL.replace(/\/$/, '');
 
 export default function App() {
   const [statusApi, setStatusApi] = useState({ carregando: true, online: false, concursos: 0 });
@@ -17,20 +14,23 @@ export default function App() {
   const [scoreMinimo, setScoreMinimo] = useState(80);
   const [maxInterseccao, setMaxInterseccao] = useState(12);
   
-  // Estados de carregamento e mensagem de erro
+  // Estados de controle da interface
   const [loadingGeracao, setLoadingGeracao] = useState(false);
   const [erro, setErro] = useState(null);
 
-  // 1. Checagem inicial do status da API e carregamento da Análise Completa
   useEffect(() => {
     verificarStatusEAnalise();
   }, []);
 
+  const getUrl = (endpoint) => {
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return `${API_BASE_URL}${cleanEndpoint}`;
+  };
+
   const verificarStatusEAnalise = async () => {
     setErro(null);
     try {
-      // Checa Status
-      const resStatus = await fetch(`${API_BASE_URL}/status`);
+      const resStatus = await fetch(getUrl('/status'));
       const dataStatus = await resStatus.json();
       
       if (resStatus.ok) {
@@ -40,34 +40,32 @@ export default function App() {
           concursos: dataStatus.total_concursos
         });
 
-        // Se a base de dados estiver carregada, busca a análise estatística
         if (dataStatus.status_base_dados === 'carregado') {
           carregarAnaliseEstatistica();
         }
       } else {
-        throw new Error("Erro ao conectar à API.");
+        throw new Error("Falha ao comunicar com o servidor.");
       }
     } catch (err) {
       setStatusApi({ carregando: false, online: false, concursos: 0 });
-      setErro("Não foi possível conectar ao servidor backend. Verifique se o main.py está em execução.");
+      setErro("Servidor offline ou hibernando no Render. Aguarde alguns segundos e atualize.");
     }
   };
 
   const carregarAnaliseEstatistica = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/analise_completa`);
+      const res = await fetch(getUrl('/analise_completa'));
       const data = await res.json();
       if (res.ok) {
         setAnalise(data);
       } else {
-        setErro(data.erro || "Falha ao carregar análise estatística.");
+        setErro(data.erro || "Não foi possível carregar o diagnóstico dos 6 Juízes.");
       }
     } catch (err) {
-      setErro("Erro de rede ao carregar análise.");
+      setErro("Erro de comunicação com a API ao buscar relatórios.");
     }
   };
 
-  // 2. Upload manual de novo arquivo Excel/CSV
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -77,7 +75,7 @@ export default function App() {
 
     setErro(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/upload_dados`, {
+      const res = await fetch(getUrl('/upload_dados'), {
         method: 'POST',
         body: formData,
       });
@@ -87,26 +85,25 @@ export default function App() {
         alert(data.mensagem);
         verificarStatusEAnalise();
       } else {
-        setErro(data.erro || "Erro no upload.");
+        setErro(data.erro || "Falha ao importar o arquivo.");
       }
     } catch (err) {
-      setErro("Falha ao enviar arquivo para a API.");
+      setErro("Erro ao enviar arquivo de dados para a API.");
     }
   };
 
-  // 3. Executar Geração dos Bilhetes Diamante
   const handleGerarPalpites = async () => {
     setLoadingGeracao(true);
     setErro(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/gerar_palpites`, {
+      const res = await fetch(getUrl('/gerar_palpites'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          quantidade: parseInt(quantidade),
-          score_minimo: parseInt(scoreMinimo),
-          max_interseccao: parseInt(maxInterseccao)
+          quantidade: Number(quantidade),
+          score_minimo: Number(scoreMinimo),
+          max_interseccao: Number(maxInterseccao)
         }),
       });
 
@@ -115,10 +112,10 @@ export default function App() {
       if (res.ok) {
         setPalpites(data.resultado);
       } else {
-        setErro(data.erro || "Erro ao gerar bilhetes.");
+        setErro(data.erro || "Não foi possível gerar bilhetes com os parâmetros definidos.");
       }
     } catch (err) {
-      setErro("Erro de comunicação ao solicitar geração de bilhetes.");
+      setErro("Erro ao processar a requisição de geração dos jogos.");
     } finally {
       setLoadingGeracao(false);
     }
@@ -128,32 +125,32 @@ export default function App() {
     <div style={styles.container}>
       {/* CABEÇALHO */}
       <header style={styles.header}>
-        <h1 style={styles.title}>💎 Lotofácil Engine - Inteligência Estatística</h1>
+        <h1 style={styles.title}>💎 Lotofácil Engine - Inteligência Quantitativa</h1>
         <div style={styles.statusBadge}>
           API: {statusApi.online ? '🟢 Online' : '🔴 Offline'} | 
-          Concursos Carregados: <strong>{statusApi.concursos}</strong>
+          Concursos: <strong>{statusApi.concursos}</strong>
         </div>
       </header>
 
-      {/* MENSAGEM DE ERRO */}
+      {/* PAINEL DE ERRO */}
       {erro && <div style={styles.errorBox}>{erro}</div>}
 
-      {/* PAINEL DE UPLOAD E CONTROLES */}
+      {/* PAINEL DE BASE DE DADOS */}
       <section style={styles.card}>
         <div style={styles.uploadRow}>
           <div>
-            <h3>📁 Base de Dados do Histórico</h3>
-            <p style={styles.subtext}>Envie uma planilha (.xlsx) ou (.csv) para atualizar a análise estatística.</p>
+            <h3 style={{ margin: 0 }}>📁 Base de Dados do Histórico</h3>
+            <p style={styles.subtext}>Faça o upload do seu arquivo de concursos (.xlsx ou .csv) caso a base esteja pendente.</p>
           </div>
           <input type="file" accept=".xlsx, .xls, .csv" onChange={handleFileUpload} style={styles.fileInput} />
         </div>
       </section>
 
-      {/* RESUMO DOS 6 JUÍZES */}
+      {/* PAINEL DOS 6 JUÍZES */}
       {analise && (
         <section style={styles.gridJudges}>
           <div style={styles.judgeCard}>
-            <h4>1. Frequência</h4>
+            <h4>1. Frequência (Top 20)</h4>
             <p><strong>Quentes:</strong> {analise.frequencia.top_5_quentes.join(', ')}</p>
             <p><strong>Frias:</strong> {analise.frequencia.top_5_frias.join(', ')}</p>
           </div>
@@ -161,7 +158,7 @@ export default function App() {
           <div style={styles.judgeCard}>
             <h4>2. Ciclos</h4>
             <p><strong>Estado:</strong> {analise.ciclos.estado_ciclo_atual}</p>
-            <p><strong>Faltam p/ Fechar:</strong> {analise.ciclos.dezenas_faltantes_para_fechar.join(', ') || 'Nenhuma'}</p>
+            <p><strong>Faltantes:</strong> {analise.ciclos.dezenas_faltantes_para_fechar.join(', ') || 'Nenhuma'}</p>
           </div>
 
           <div style={styles.judgeCard}>
@@ -179,23 +176,23 @@ export default function App() {
           <div style={styles.judgeCard}>
             <h4>5. Repetições</h4>
             <p><strong>Repetições Ideais:</strong> {analise.sequencias_repeticoes.padroes_ideais.top_3_quantidades_repetidas.join(', ')}</p>
-            <p><strong>Última Repetição:</strong> {analise.sequencias_repeticoes.ultimo_concurso.repetidas_do_anterior}</p>
+            <p><strong>Último Sorteio:</strong> {analise.sequencias_repeticoes.ultimo_concurso.repetidas_do_anterior}</p>
           </div>
 
           <div style={styles.judgeCard}>
             <h4>6. Moldura / Miolo</h4>
             <p><strong>Moldura Ideal:</strong> {analise.moldura_miolo.padroes_ideais.quantidades_moldura.join(', ')} dezenas</p>
-            <p><strong>Último Sorteio:</strong> {analise.moldura_miolo.ultimo_concurso.moldura} na Moldura / {analise.moldura_miolo.ultimo_concurso.miolo} no Miolo</p>
+            <p><strong>Último Sorteio:</strong> {analise.moldura_miolo.ultimo_concurso.moldura} Moldura / {analise.moldura_miolo.ultimo_concurso.miolo} Miolo</p>
           </div>
         </section>
       )}
 
-      {/* CONTROLES DO GERADOR DIAMANTE */}
+      {/* FORMULÁRIO DE GERAÇÃO */}
       <section style={styles.card}>
-        <h2>⚙️ Gerador de Bilhetes Diamante</h2>
+        <h2 style={{ marginTop: 0 }}>⚙️ Gerador de Bilhetes Diamante</h2>
         <div style={styles.paramsGrid}>
           <label style={styles.label}>
-            Qtd. de Bilhetes:
+            Quantidade de Bilhetes:
             <input 
               type="number" 
               value={quantidade} 
@@ -217,7 +214,7 @@ export default function App() {
           </label>
 
           <label style={styles.label}>
-            Max Intersecção (Diversidade):
+            Máx. Intersecção (Diversidade):
             <input 
               type="number" 
               value={maxInterseccao} 
@@ -233,16 +230,16 @@ export default function App() {
           disabled={loadingGeracao || !statusApi.online}
           style={loadingGeracao ? {...styles.button, opacity: 0.6} : styles.button}
         >
-          {loadingGeracao ? 'Gerando Jogos com IA Estatística...' : '🚀 Gerar Bilhetes Diamante'}
+          {loadingGeracao ? 'Simulando com Algoritmo Quantitativo...' : '🚀 Gerar Bilhetes Diamante'}
         </button>
       </section>
 
-      {/* RESULTADO DOS BILHETES GERADOS */}
+      {/* BILHETES SELECIONADOS */}
       {palpites && (
         <section style={styles.card}>
           <div style={styles.resultsHeader}>
-            <h2>🎯 Bilhetes Selecionados ({palpites.bilhetes.length})</h2>
-            <span>Eficiência do Processamento: <strong>{palpites.eficiencia}</strong> ({palpites.tentativas_gastas} simulações)</span>
+            <h2 style={{ margin: 0 }}>🎯 Jogos Aprovados ({palpites.bilhetes.length})</h2>
+            <span>Eficiência: <strong>{palpites.eficiencia}</strong> ({palpites.tentativas_gastas} simulações)</span>
           </div>
 
           <div style={styles.gamesList}>
@@ -265,15 +262,14 @@ export default function App() {
   );
 }
 
-// ESTILOS EM CSS-IN-JS SIMPLES E RESPONSIVO
 const styles = {
   container: { fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif', maxWidth: '1100px', margin: '0 auto', padding: '20px', backgroundColor: '#f4f7f6', minHeight: '100vh' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', background: '#1e293b', color: '#fff', padding: '20px', borderRadius: '10px' },
-  title: { margin: 0, fontSize: '1.4rem' },
-  statusBadge: { backgroundColor: '#334155', padding: '8px 15px', borderRadius: '20px', fontSize: '0.9rem' },
+  title: { margin: 0, fontSize: '1.3rem' },
+  statusBadge: { backgroundColor: '#334155', padding: '8px 15px', borderRadius: '20px', fontSize: '0.85rem' },
   errorBox: { backgroundColor: '#fef2f2', border: '1px solid #f87171', color: '#991b1b', padding: '15px', borderRadius: '8px', marginBottom: '20px' },
   card: { background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', marginBottom: '20px' },
-  uploadRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  uploadRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' },
   subtext: { color: '#64748b', fontSize: '0.85rem', margin: '5px 0 0 0' },
   fileInput: { padding: '8px' },
   gridJudges: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px', marginBottom: '20px' },

@@ -6,46 +6,50 @@ from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
 app = Flask(__name__)
 
-# Configuração de CORS para permitir requisições do Frontend local ou em produção
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+# Libera CORS globalmente para evitar erros de bloqueio Vercel <-> Render
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
-# Variável global para armazenar o DataFrame em memória
 DF_LOTOFACIL = None
 
 def carregar_dados_iniciais():
     """
-    Tenta carregar o arquivo excel/csv do histórico da Lotofácil na inicialização.
-    Procura por arquivos 'lotofacil.xlsx' ou 'lotofacil.csv' na raiz.
+    Carrega automaticamente a planilha de histórico do projeto se ela existir na raiz.
     """
     global DF_LOTOFACIL
-    caminhos_possiveis = ['lotofacil.xlsx', 'lotofacil.csv', 'base_lotofacil.xlsx']
+    caminhos_possiveis = [
+        'lotofacil.xlsx', 
+        'lotofacil.csv', 
+        'base_lotofacil.xlsx', 
+        'base_lotofacil.csv'
+    ]
     
     for caminho in caminhos_possiveis:
         if os.path.exists(caminho):
             try:
-                if caminho.endswith('.xlsx'):
+                if caminho.endswith('.xlsx') or caminho.endswith('.xls'):
                     DF_LOTOFACIL = pd.read_excel(caminho)
                 else:
                     DF_LOTOFACIL = pd.read_csv(caminho)
-                print(f"[INFO] Base de dados carregada com sucesso a partir de: {caminho}")
+                print(f"[SUCESSO] Base de dados carregada automaticamente: {caminho} ({len(DF_LOTOFACIL)} concursos)")
                 return
             except Exception as e:
                 print(f"[ERRO] Falha ao ler {caminho}: {e}")
-    
-    print("[AVISO] Nenhum arquivo base encontrado na inicialização. Aguardando upload via API.")
+            
+    print("[AVISO] Nenhuma base de dados encontrada na raiz. Suba 'lotofacil.xlsx' no GitHub para carregamento automático.")
 
-# Carrega os dados assim que o servidor é iniciado
+# Executa o carregamento assim que o servidor é iniciado
 carregar_dados_iniciais()
 
 
 # ==========================================
-# ROTAS DA API
+# ROTAS DA API (Aceitam rotas com ou sem /api)
 # ==========================================
 
+@app.route('/status', methods=['GET'])
 @app.route('/api/status', methods=['GET'])
 def status():
     """
-    Endpoint para verificar a saúde da API e status do arquivo carregado.
+    Endpoint para verificação de saúde da API e status da base de dados.
     """
     status_dados = "carregado" if DF_LOTOFACIL is not None else "pendente"
     total_concursos = len(DF_LOTOFACIL) if DF_LOTOFACIL is not None else 0
@@ -57,14 +61,15 @@ def status():
     }), 200
 
 
+@app.route('/upload_dados', methods=['POST'])
 @app.route('/api/upload_dados', methods=['POST'])
 def upload_dados():
     """
-    Endpoint para envio do arquivo Excel ou CSV com o histórico de sorteios.
+    Endpoint para upload manual da planilha (.xlsx ou .csv).
     """
     global DF_LOTOFACIL
     if 'file' not in request.files:
-        return jsonify({"erro": "Nenhum arquivo enviado."}), 400
+        return jsonify({"erro": "Nenhum arquivo foi enviado."}), 400
 
     file = request.files['file']
     if file.filename == '':
@@ -83,17 +88,20 @@ def upload_dados():
             "total_concursos": len(DF_LOTOFACIL)
         }), 200
     except Exception as e:
-        return jsonify({"erro": f"Erro ao processar o arquivo: {str(e)}"}), 500
+        return jsonify({"erro": f"Erro ao processar arquivo: {str(e)}"}), 500
 
 
+@app.route('/analise_completa', methods=['GET'])
 @app.route('/api/analise_completa', methods=['GET'])
 def obter_analise_completa():
     """
-    Retorna o diagnóstico estatístico consolidado dos 6 Juízes.
+    Retorna a análise quantitativa dos 6 Juízes estatísticos.
     """
     global DF_LOTOFACIL
     if DF_LOTOFACIL is None:
-        return jsonify({"erro": "Base de dados não carregada na API."}), 400
+        return jsonify({
+            "erro": "Base de dados não carregada na API. Adicione o arquivo lotofacil.xlsx na raiz do GitHub ou faça o upload na interface."
+        }), 400
 
     try:
         motor = LotofacilEngine(DF_LOTOFACIL)
@@ -109,29 +117,29 @@ def obter_analise_completa():
         
         return jsonify(relatorio), 200
     except Exception as e:
-        return jsonify({"erro": f"Erro ao processar análise estatística: {str(e)}"}), 500
+        return jsonify({"erro": f"Erro na análise estatística: {str(e)}"}), 500
 
 
+@app.route('/gerar_palpites', methods=['POST'])
 @app.route('/api/gerar_palpites', methods=['POST'])
 def gerar_palpites():
     """
-    Gera Bilhetes Diamante utilizando os 6 Juízes, Score de Qualidade,
-    Amostragem Ponderada e Controle de Diversidade.
+    Gera Bilhetes Diamante utilizando pontuação de score, amostragem ponderada e controle de diversidade.
     """
     global DF_LOTOFACIL
     if DF_LOTOFACIL is None:
-        return jsonify({"erro": "Base de dados não carregada na API."}), 400
+        return jsonify({
+            "erro": "Base de dados não carregada na API."
+        }), 400
 
     try:
         dados = request.get_json() or {}
         
-        # Parâmetros customizáveis via frontend com valores padrão
-        quantidade = int(dados.get('quantidade', 3))
+        quantidade = int(dados.get('quantidade', dados.get('qtd_jogos', 3)))
         score_minimo = int(dados.get('score_minimo', 80))
         max_interseccao = int(dados.get('max_interseccao', 12))
         max_tentativas = int(dados.get('max_tentativas', 10000))
 
-        # Execução das análises dos 6 Juízes
         motor = LotofacilEngine(DF_LOTOFACIL)
         stats_freq = motor.juiz_de_frequencia(janela=20)
         stats_ciclos = motor.juiz_de_padroes_e_ciclos()
@@ -140,7 +148,6 @@ def gerar_palpites():
         stats_seq = motor.juiz_de_sequencias_e_repeticoes()
         stats_moldura = motor.juiz_de_moldura_e_miolo()
 
-        # Instanciação do Validador por Score e do Gerador
         validador = CuradorDeValidacao(
             stats_ciclos=stats_ciclos,
             stats_paridade=stats_par,
@@ -158,7 +165,6 @@ def gerar_palpites():
             stats_moldura=stats_moldura
         )
 
-        # Geração dos bilhetes
         resultado = gerador.gerar_bilhetes_diamante(
             quantidade=quantidade,
             max_tentativas=max_tentativas,
@@ -167,7 +173,7 @@ def gerar_palpites():
 
         return jsonify({
             "parametros_utilizados": {
-                "quantidade_solicitada": quantidade,
+                "quantidade": quantidade,
                 "score_minimo": score_minimo,
                 "max_interseccao": max_interseccao
             },
@@ -179,6 +185,5 @@ def gerar_palpites():
 
 
 if __name__ == '__main__':
-    # Configuração de porta dinâmica para nuvem (ex: Render/Heroku) ou 5000 local
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
