@@ -1,9 +1,9 @@
 import os
 import glob
 import pandas as pd
+import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from supabase import create_client, Client
 from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
 app = Flask(__name__)
@@ -15,13 +15,9 @@ CORS(app, resources={r"/api/*": {"origins": URL_FRONTEND}})
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# --- CONFIGURAÇÃO SUPABASE ---
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
-
-supabase: Client = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# --- CONFIGURAÇÃO SUPABASE (VIA REST API) ---
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
 
 @app.route('/')
 def home():
@@ -103,7 +99,7 @@ def gerar_palpites():
 
 @app.route('/api/salvar_bilhetes', methods=['POST'])
 def salvar_bilhetes():
-    if not supabase:
+    if not SUPABASE_URL or not SUPABASE_KEY:
         return jsonify({"error": "Supabase não está configurado."}), 500
         
     dados = request.json or {}
@@ -118,20 +114,41 @@ def salvar_bilhetes():
         for curador, dezenas in palpites.items()
     ]
     
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+    }
+    url = f"{SUPABASE_URL}/rest/v1/bilhetes_gerados"
+    
     try:
-        supabase.table("bilhetes_gerados").insert(registros).execute()
-        return jsonify({"status": "sucesso", "mensagem": f"Bilhetes do concurso {concurso} salvos!"})
+        response = requests.post(url, json=registros, headers=headers)
+        if response.status_code in [200, 201]:
+            return jsonify({"status": "sucesso", "mensagem": f"Bilhetes do concurso {concurso} salvos!"})
+        else:
+            return jsonify({"error": f"Erro do Supabase: {response.text}"}), 500
     except Exception as e:
         return jsonify({"error": f"Erro ao salvar no banco: {str(e)}"}), 500
 
 @app.route('/api/auditar/<int:concurso_alvo>', methods=['GET'])
 def auditar_resultado(concurso_alvo):
-    if not supabase:
+    if not SUPABASE_URL or not SUPABASE_KEY:
         return jsonify({"error": "Supabase não configurado."}), 500
         
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+    url = f"{SUPABASE_URL}/rest/v1/bilhetes_gerados?concurso=eq.{concurso_alvo}"
+    
     try:
-        res_db = supabase.table("bilhetes_gerados").select("*").eq("concurso", concurso_alvo).execute()
-        bilhetes_salvos = res_db.data
+        res_db = requests.get(url, headers=headers)
+        if res_db.status_code != 200:
+            return jsonify({"error": f"Erro ao buscar no Supabase: {res_db.text}"}), 500
+            
+        bilhetes_salvos = res_db.json()
         
         if not bilhetes_salvos:
             return jsonify({"error": f"Nenhum palpite salvo para o concurso {concurso_alvo}."}), 404
