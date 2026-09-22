@@ -1,171 +1,184 @@
 import os
-import glob
-import traceback
-import numpy as np
-import pandas as pd
-from flask import Flask, jsonify, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-from supabase import create_client, Client
+import pandas as pd
 from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
 app = Flask(__name__)
-CORS(app)
 
-UPLOAD_FOLDER = 'uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# Configuração de CORS para permitir requisições do Frontend local ou em produção
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-def sanitize_for_json(data):
-    if isinstance(data, dict):
-        return {str(k): sanitize_for_json(v) for k, v in data.items()}
-    elif isinstance(data, (list, tuple, set)):
-        return [sanitize_for_json(v) for v in data]
-    elif isinstance(data, (np.integer, np.int64, np.int32)):
-        return int(data)
-    elif isinstance(data, (np.floating, np.float64, np.float32)):
-        return float(data)
-    elif isinstance(data, np.ndarray):
-        return data.tolist()
-    return data
+# Variável global para armazenar o DataFrame em memória
+DF_LOTOFACIL = None
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
-supabase: Client = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-@app.route('/')
-def home():
-    return jsonify({"status": "online", "message": "API Lotofácil IA Online"})
-
-@app.route('/api/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({"error": "Nenhum ficheiro enviado"}), 400
+def carregar_dados_iniciais():
+    """
+    Tenta carregar o arquivo excel/csv do histórico da Lotofácil na inicialização.
+    Procura por arquivos 'lotofacil.xlsx' ou 'lotofacil.csv' na raiz.
+    """
+    global DF_LOTOFACIL
+    caminhos_possiveis = ['lotofacil.xlsx', 'lotofacil.csv', 'base_lotofacil.xlsx']
     
-    file = request.files['file']
-    filepath = os.path.join(UPLOAD_FOLDER, file.filename)
-    file.save(filepath)
+    for caminho in caminhos_possiveis:
+        if os.path.exists(caminho):
+            try:
+                if caminho.endswith('.xlsx'):
+                    DF_LOTOFACIL = pd.read_excel(caminho)
+                else:
+                    DF_LOTOFACIL = pd.read_csv(caminho)
+                print(f"[INFO] Base de dados carregada com sucesso a partir de: {caminho}")
+                return
+            except Exception as e:
+                print(f"[ERRO] Falha ao ler {caminho}: {e}")
     
-    try:
-        df = pd.read_excel(filepath)
-        col_concurso = [c for c in df.columns if str(c).strip().lower() == 'concurso']
-        if col_concurso:
-            ultimo_concurso = int(df[col_concurso[0]].max())
-        else:
-            ultimo_concurso = 0
-            
-    except Exception as e:
-        return jsonify({"error": f"Erro ao processar Excel: {str(e)}"}), 500
+    print("[AVISO] Nenhum arquivo base encontrado na inicialização. Aguardando upload via API.")
 
+# Carrega os dados assim que o servidor é iniciado
+carregar_dados_iniciais()
+
+
+# ==========================================
+# ROTAS DA API
+# ==========================================
+
+@app.route('/api/status', methods=['GET'])
+def status():
+    """
+    Endpoint para verificar a saúde da API e status do arquivo carregado.
+    """
+    status_dados = "carregado" if DF_LOTOFACIL is not None else "pendente"
+    total_concursos = len(DF_LOTOFACIL) if DF_LOTOFACIL is not None else 0
+    
     return jsonify({
-        "message": "Base atualizada com sucesso!",
-        "ultimo_concurso": ultimo_concurso,
-        "proximo_concurso": ultimo_concurso + 1
-    })
+        "status_api": "online",
+        "status_base_dados": status_dados,
+        "total_concursos": total_concursos
+    }), 200
+
+
+@app.route('/api/upload_dados', methods=['POST'])
+def upload_dados():
+    """
+    Endpoint para envio do arquivo Excel ou CSV com o histórico de sorteios.
+    """
+    global DF_LOTOFACIL
+    if 'file' not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado."}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"erro": "Nome de arquivo inválido."}), 400
+
+    try:
+        if file.filename.endswith('.xlsx') or file.filename.endswith('.xls'):
+            DF_LOTOFACIL = pd.read_excel(file)
+        elif file.filename.endswith('.csv'):
+            DF_LOTOFACIL = pd.read_csv(file)
+        else:
+            return jsonify({"erro": "Formato inválido. Envie um arquivo .xlsx ou .csv"}), 400
+
+        return jsonify({
+            "mensagem": "Base de dados atualizada com sucesso!",
+            "total_concursos": len(DF_LOTOFACIL)
+        }), 200
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao processar o arquivo: {str(e)}"}), 500
+
+
+@app.route('/api/analise_completa', methods=['GET'])
+def obter_analise_completa():
+    """
+    Retorna o diagnóstico estatístico consolidado dos 6 Juízes.
+    """
+    global DF_LOTOFACIL
+    if DF_LOTOFACIL is None:
+        return jsonify({"erro": "Base de dados não carregada na API."}), 400
+
+    try:
+        motor = LotofacilEngine(DF_LOTOFACIL)
+        
+        relatorio = {
+            "frequencia": motor.juiz_de_frequencia(janela=20),
+            "ciclos": motor.juiz_de_padroes_e_ciclos(),
+            "paridade_primos": motor.juiz_de_paridade_e_primos(),
+            "soma_amplitude": motor.juiz_de_soma_e_amplitude(),
+            "sequencias_repeticoes": motor.juiz_de_sequencias_e_repeticoes(),
+            "moldura_miolo": motor.juiz_de_moldura_e_miolo()
+        }
+        
+        return jsonify(relatorio), 200
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao processar análise estatística: {str(e)}"}), 500
+
 
 @app.route('/api/gerar_palpites', methods=['POST'])
 def gerar_palpites():
+    """
+    Gera Bilhetes Diamante utilizando os 6 Juízes, Score de Qualidade,
+    Amostragem Ponderada e Controle de Diversidade.
+    """
+    global DF_LOTOFACIL
+    if DF_LOTOFACIL is None:
+        return jsonify({"erro": "Base de dados não carregada na API."}), 400
+
     try:
-        arquivos_excel = glob.glob(os.path.join(UPLOAD_FOLDER, '*.xlsx'))
-        if not arquivos_excel:
-            return jsonify({"error": "Faça upload do Excel primeiro."}), 400
+        dados = request.get_json() or {}
         
-        df = pd.read_excel(arquivos_excel[0])
-        col_concurso = [c for c in df.columns if str(c).strip().lower() == 'concurso']
-        concurso_alvo = int(df[col_concurso[0]].max()) + 1 if col_concurso else 0
-        
-        # 1. IA Trabalha
-        motor = LotofacilEngine(df)
+        # Parâmetros customizáveis via frontend com valores padrão
+        quantidade = int(dados.get('quantidade', 3))
+        score_minimo = int(dados.get('score_minimo', 80))
+        max_interseccao = int(dados.get('max_interseccao', 12))
+        max_tentativas = int(dados.get('max_tentativas', 10000))
+
+        # Execução das análises dos 6 Juízes
+        motor = LotofacilEngine(DF_LOTOFACIL)
         stats_freq = motor.juiz_de_frequencia(janela=20)
         stats_ciclos = motor.juiz_de_padroes_e_ciclos()
         stats_par = motor.juiz_de_paridade_e_primos()
         stats_soma = motor.juiz_de_soma_e_amplitude()
         stats_seq = motor.juiz_de_sequencias_e_repeticoes()
+        stats_moldura = motor.juiz_de_moldura_e_miolo()
 
-        validador = CuradorDeValidacao(stats_ciclos, stats_par, stats_soma, stats_seq)
-        gerador = CuradorDeSelecaoFinal(validador, stats_freq, stats_ciclos, stats_seq)
+        # Instanciação do Validador por Score e do Gerador
+        validador = CuradorDeValidacao(
+            stats_ciclos=stats_ciclos,
+            stats_paridade=stats_par,
+            stats_soma=stats_soma,
+            stats_sequencias=stats_seq,
+            stats_moldura=stats_moldura,
+            score_minimo=score_minimo
+        )
 
-        resultado = gerador.gerar_bilhetes_diamante(quantidade=3)
+        gerador = CuradorDeSelecaoFinal(
+            validador=validador,
+            stats_frequencia=stats_freq,
+            stats_ciclos=stats_ciclos,
+            stats_sequencias=stats_seq,
+            stats_moldura=stats_moldura
+        )
 
-        if not resultado["bilhetes"]:
-            return jsonify({"error": "Os juízes rejeitaram todos os palpites."}), 500
+        # Geração dos bilhetes
+        resultado = gerador.gerar_bilhetes_diamante(
+            quantidade=quantidade,
+            max_tentativas=max_tentativas,
+            max_interseccao=max_interseccao
+        )
 
-        palpites_finais = {
-            f"curador{i+1}": [int(n) for n in bilhete]
-            for i, bilhete in enumerate(resultado["bilhetes"])
-        }
-        
-        # Gravação automática no Supabase após gerar
-        if supabase:
-            registos = [
-                {"concurso": concurso_alvo, "curador": curador, "dezenas": dezenas}
-                for curador, dezenas in palpites_finais.items()
-            ]
-            supabase.table("bilhetes_gerados").insert(registos).execute()
-
-        resposta = {
-            "status": "sucesso",
-            "concurso": concurso_alvo,
-            "palpites": palpites_finais,
-            "metricas_ia": {
-                "tentativas": int(resultado["tentativas_gastas"]),
-                "eficiencia": resultado["eficiencia"]
+        return jsonify({
+            "parametros_utilizados": {
+                "quantidade_solicitada": quantidade,
+                "score_minimo": score_minimo,
+                "max_interseccao": max_interseccao
             },
-            "relatorio_juizes": {
-                "ciclo_estado": stats_ciclos["estado_ciclo_atual"],
-                "ciclo_faltam": stats_ciclos["dezenas_faltantes_para_fechar"],
-                "quentes": stats_freq["top_5_quentes"],
-                "frias": stats_freq["top_5_frias"]
-            }
-        }
-        return jsonify(sanitize_for_json(resposta))
+            "resultado": resultado
+        }), 200
 
     except Exception as e:
-        print(traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"erro": f"Erro ao gerar bilhetes: {str(e)}"}), 500
 
-@app.route('/api/auditar/<int:concurso_alvo>', methods=['GET'])
-def auditar_resultado(concurso_alvo):
-    if not supabase:
-        return jsonify({"error": "Supabase não configurado."}), 500
-        
-    try:
-        res_db = supabase.table("bilhetes_gerados").select("*").eq("concurso", concurso_alvo).execute()
-        bilhetes_salvos = res_db.data
-        if not bilhetes_salvos:
-            return jsonify({"error": f"Sem histórico para auditar o concurso {concurso_alvo}."}), 404
-
-        arquivos_excel = glob.glob(os.path.join(UPLOAD_FOLDER, '*.xlsx'))
-        df = pd.read_excel(arquivos_excel[0])
-        col_concurso = [c for c in df.columns if str(c).strip().lower() == 'concurso']
-        linha_resultado = df[df[col_concurso[0]] == concurso_alvo]
-        
-        if linha_resultado.empty:
-            return jsonify({"error": "Sorteio ainda não consta no Excel."}), 404
-            
-        colunas_dezenas = [col for col in df.columns if 'Bola' in str(col) or 'Dezena' in str(col)]
-        if not colunas_dezenas or len(colunas_dezenas) != 15:
-            colunas_dezenas = df.columns[-15:]
-            
-        dezenas_sorteadas = set(linha_resultado.iloc[0][colunas_dezenas].astype(int).tolist())
-
-        resultados = []
-        for bilhete in bilhetes_salvos:
-            acertos = len(dezenas_sorteadas.intersection(set(bilhete['dezenas'])))
-            resultados.append({
-                "curador": bilhete['curador'],
-                "acertos": acertos,
-                "dezenas_apostadas": bilhete['dezenas']
-            })
-            
-        return jsonify(sanitize_for_json({
-            "status": "sucesso",
-            "concurso": concurso_alvo,
-            "sorteadas": list(dezenas_sorteadas),
-            "resultados": resultados
-        }))
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+    # Configuração de porta dinâmica para nuvem (ex: Render/Heroku) ou 5000 local
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)

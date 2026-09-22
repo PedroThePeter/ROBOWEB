@@ -7,7 +7,6 @@ class LotofacilEngine:
         """
         Recebe o DataFrame de concursos e realiza a limpeza inicial das colunas.
         """
-        # Remove linhas inteiramente vazias caso existam no final do Excel
         self.df = df.dropna(how='all').copy()
         self.dezenas_totais = np.arange(1, 26)
         
@@ -27,7 +26,6 @@ class LotofacilEngine:
         frequencias_series = pd.Series(todas_bolas_sorteadas).value_counts()
         frequencias = frequencias_series.reindex(self.dezenas_totais, fill_value=0)
 
-        # Histórico invertido para busca de atrasos
         grid_historico_invertido = self.df[self.colunas_dezenas][::-1].values
         
         atrasos = {}
@@ -86,10 +84,7 @@ class LotofacilEngine:
         """
         grid = self.df[self.colunas_dezenas].values
         
-        # Contagem vetorizada de pares
         pares_por_linha = np.sum(grid % 2 == 0, axis=1)
-        
-        # Contagem vetorizada de primos
         primos_set = {2, 3, 5, 7, 11, 13, 17, 19, 23}
         is_primo_grid = np.isin(grid, list(primos_set))
         primos_por_linha = np.sum(is_primo_grid, axis=1)
@@ -114,7 +109,7 @@ class LotofacilEngine:
 
     def juiz_de_soma_e_amplitude(self):
         """
-        4º JUIZ: Analisa a soma total e a amplitude (diferença entre maior e menor dezena).
+        4º JUIZ: Analisa a soma total e a amplitude.
         """
         grid = self.df[self.colunas_dezenas].values
         
@@ -150,7 +145,6 @@ class LotofacilEngine:
         """
         grid = self.df[self.colunas_dezenas].values
         
-        # One-Hot Encoding para repetições
         matriz_binaria = np.zeros((len(grid), 25), dtype=bool)
         linhas_idx = np.repeat(np.arange(len(grid)), 15)
         colunas_idx = grid.ravel() - 1
@@ -160,7 +154,6 @@ class LotofacilEngine:
         dist_repeticoes = pd.Series(repeticoes_historico).value_counts()
         top_3_repeticoes = [int(r) for r in dist_repeticoes.nlargest(3).index]
 
-        # Sequências consecutivas
         maiores_sequencias = [
             max([len(seq) for seq in np.split(linha, np.where(np.diff(linha) != 1)[0] + 1)]) 
             for linha in grid
@@ -189,32 +182,92 @@ class LotofacilEngine:
             }
         }
 
+    def juiz_de_moldura_e_miolo(self):
+        """
+        [AJUSTE 1] 6º JUIZ: Analisa o equilíbrio entre Moldura (bordas) e Miolo (centro).
+        Moldura (16 dezenas): 1,2,3,4,5,6,10,11,15,16,20,21,22,23,24,25
+        Miolo (9 dezenas): 7,8,9,12,13,14,17,18,19
+        """
+        grid = self.df[self.colunas_dezenas].values
+        moldura_set = {1, 2, 3, 4, 5, 6, 10, 11, 15, 16, 20, 21, 22, 23, 24, 25}
+        
+        is_moldura_grid = np.isin(grid, list(moldura_set))
+        moldura_por_linha = np.sum(is_moldura_grid, axis=1)
+
+        dist_moldura = pd.Series(moldura_por_linha).value_counts()
+        top_moldura = [int(m) for m in dist_moldura.nlargest(4).index]
+
+        return {
+            "padroes_ideais": {
+                "quantidades_moldura": top_moldura
+            },
+            "ultimo_concurso": {
+                "moldura": int(moldura_por_linha[-1]),
+                "miolo": int(15 - moldura_por_linha[-1])
+            }
+        }
+
 
 class CuradorDeValidacao:
-    def __init__(self, stats_ciclos, stats_paridade, stats_soma, stats_sequencias):
+    def __init__(self, stats_ciclos, stats_paridade, stats_soma, stats_sequencias, stats_moldura=None, score_minimo=80):
         """
-        Recebe os relatórios dos Juízes para validar cada bilhete gerado.
+        Recebe os relatórios dos Juízes e aplica um sistema de pontuação (Score 0 a 100).
         """
         self.ciclos = stats_ciclos
         self.paridade = stats_paridade
         self.soma = stats_soma
         self.sequencias = stats_sequencias
+        self.moldura = stats_moldura
+        self.score_minimo = score_minimo
+        
         self.primos_oficiais = {2, 3, 5, 7, 11, 13, 17, 19, 23}
+        self.moldura_oficial = {1, 2, 3, 4, 5, 6, 10, 11, 15, 16, 20, 21, 22, 23, 24, 25}
 
     def avaliar_bilhete(self, bilhete: list) -> tuple:
+        """
+        [AJUSTE 5] Avaliação baseada em Pontuação (Score de Qualidade Estatística 0-100).
+        """
         if len(set(bilhete)) != 15:
             return False, "Rejeitado: O bilhete não contém 15 dezenas únicas."
 
         bilhete_set = set(bilhete)
-        
+        score = 0
+
+        # 1. PARIDADE (Até 15 Pontos)
         qtd_pares = sum(1 for x in bilhete if x % 2 == 0)
-        qtd_impares = 15 - qtd_pares
+        pares_aceites = self.paridade['padroes_ideais']['pares_impares']
+        if qtd_pares in pares_aceites:
+            score += 15
+        elif abs(qtd_pares - pares_aceites[0]) == 1:
+            score += 8
+
+        # 2. PRIMOS (Até 15 Pontos)
         qtd_primos = len(bilhete_set.intersection(self.primos_oficiais))
+        primos_aceites = self.paridade['padroes_ideais']['quantidades_primos']
+        if qtd_primos in primos_aceites:
+            score += 15
+        elif abs(qtd_primos - primos_aceites[0]) == 1:
+            score += 8
+
+        # 3. SOMA TOTAL (Até 20 Pontos)
         soma_total = sum(bilhete)
-        
+        soma_ouro_min, soma_ouro_max = self.soma['padroes_ideais']['soma_zona_de_ouro']
+        soma_seg_min, soma_seg_max = self.soma['padroes_ideais']['soma_margem_seguranca']
+        if soma_ouro_min <= soma_total <= soma_ouro_max:
+            score += 20
+        elif soma_seg_min <= soma_total <= soma_seg_max:
+            score += 12
+
+        # 4. REPETIÇÕES DO CONCURSO ANTERIOR (Até 15 Pontos)
         ultimo_sorteio = set(self.sequencias['ultimo_concurso']['dezenas'])
         qtd_repetidas = len(bilhete_set.intersection(ultimo_sorteio))
-        
+        repeticoes_aceites = self.sequencias['padroes_ideais']['top_3_quantidades_repetidas']
+        if qtd_repetidas in repeticoes_aceites:
+            score += 15
+        elif abs(qtd_repetidas - repeticoes_aceites[0]) == 1:
+            score += 8
+
+        # 5. SEQUÊNCIAS CONSECUTIVAS (Até 15 Pontos)
         bilhete_ordenado = sorted(list(bilhete))
         max_seq, seq_atual = 1, 1
         for i in range(1, 15):
@@ -223,83 +276,119 @@ class CuradorDeValidacao:
                 max_seq = max(max_seq, seq_atual)
             else:
                 seq_atual = 1
-
-        # FILTROS ESTATÍSTICOS RIGOROSOS
-        pares_aceites = self.paridade['padroes_ideais']['pares_impares']
-        if qtd_pares not in pares_aceites:
-            return False, f"Rejeitado: {qtd_pares} Pares / {qtd_impares} Ímpares é estatisticamente improvável."
-
-        primos_aceites = self.paridade['padroes_ideais']['quantidades_primos']
-        if qtd_primos not in primos_aceites:
-            return False, f"Rejeitado: {qtd_primos} dezenas primas foge do padrão histórico."
-
-        soma_min, soma_max = self.soma['padroes_ideais']['soma_margem_seguranca']
-        if not (soma_min <= soma_total <= soma_max):
-            return False, f"Rejeitado: Soma total ({soma_total}) fora da margem aceitável."
-
-        repeticoes_aceites = self.sequencias['padroes_ideais']['top_3_quantidades_repetidas']
-        if qtd_repetidas not in repeticoes_aceites:
-            return False, f"Rejeitado: {qtd_repetidas} repetições do concurso anterior."
-
+        
         seqs_aceites = self.sequencias['padroes_ideais']['top_3_tamanhos_sequencia']
-        if max_seq > max(seqs_aceites):
-            return False, f"Rejeitado: Anomalia sequencial de {max_seq} dezenas seguidas."
+        if max_seq <= max(seqs_aceites):
+            score += 15
+        elif max_seq == max(seqs_aceites) + 1:
+            score += 7
 
+        # 6. MOLDURA vs. MIOLO (Até 10 Pontos - AJUSTE 1)
+        qtd_moldura = len(bilhete_set.intersection(self.moldura_oficial))
+        if self.moldura:
+            moldura_aceita = self.moldura['padroes_ideais']['quantidades_moldura']
+            if qtd_moldura in moldura_aceita:
+                score += 10
+            elif abs(qtd_moldura - moldura_aceita[0]) == 1:
+                score += 5
+        else:
+            # Fallback histórico padrão (8, 9, 10 dezenas na moldura)
+            if qtd_moldura in [8, 9, 10]:
+                score += 10
+            elif qtd_moldura in [7, 11]:
+                score += 5
+
+        # 7. CICLOS (Até 10 Pontos - AJUSTE 4: Flexibilizado)
         faltam = self.ciclos['dezenas_faltantes_para_fechar']
         if self.ciclos['estado_ciclo_atual'] == "ABERTO" and len(faltam) <= 3:
-            if not set(faltam).issubset(bilhete_set):
-                return False, f"Rejeitado: Ignorou as dezenas maduras do fim do ciclo: {faltam}."
+            interseccao_ciclo = len(set(faltam).intersection(bilhete_set))
+            if interseccao_ciclo == len(faltam):
+                score += 10  # Incluiu todas as faltantes
+            elif interseccao_ciclo >= 1:
+                score += 5   # Incluiu ao menos 1 dezena madura
+        else:
+            score += 10     # Ciclo fechado ou longe de fechar (neutro)
 
-        return True, "Aprovado: Bilhete classificado como Diamante Estatístico."
+        # APROVAÇÃO FINAL PELO SCORE CORTE
+        if score >= self.score_minimo:
+            return True, f"Aprovado: Bilhete Diamante Estatístico (Score: {score}/100)."
+        else:
+            return False, f"Rejeitado: Score insuficiente ({score}/100 - Mínimo exigido: {self.score_minimo})."
 
 
 class CuradorDeSelecaoFinal:
-    def __init__(self, validador, stats_frequencia, stats_ciclos, stats_sequencias):
+    def __init__(self, validador, stats_frequencia, stats_ciclos, stats_sequencias, stats_moldura=None):
         self.validador = validador
         self.frequencia = stats_frequencia
         self.ciclos = stats_ciclos
         self.sequencias = stats_sequencias
+        self.moldura = stats_moldura
         self.dezenas_totais = set(range(1, 26))
 
-    def gerar_bilhetes_diamante(self, quantidade=3, max_tentativas=10000):
+    def gerar_bilhetes_diamante(self, quantidade=3, max_tentativas=10000, max_interseccao=12):
+        """
+        Gera bilhetes inteligentes com amostragem ponderada, flexibilidade de ciclo e controle de diversidade.
+        """
         bilhetes_aprovados = []
         tentativas = 0
 
-        dezenas_obrigatorias = set()
+        # [AJUSTE 3] Amostragem Ponderada: Cria pesos com base na frequência das dezenas
+        freq_dict = self.frequencia.get('frequencias', {})
         
         faltam_ciclo = self.ciclos['dezenas_faltantes_para_fechar']
-        if self.ciclos['estado_ciclo_atual'] == "ABERTO" and len(faltam_ciclo) <= 3:
-            dezenas_obrigatorias.update(faltam_ciclo)
-
         ultimo_concurso = set(self.sequencias['ultimo_concurso']['dezenas'])
-        alvo_repeticoes = self.sequencias['padroes_ideais']['top_3_quantidades_repetidas'][0]
+        top_repeticoes = self.sequencias['padroes_ideais']['top_3_quantidades_repetidas']
 
         while len(bilhetes_aprovados) < quantidade and tentativas < max_tentativas:
             tentativas += 1
-            bilhete_candidato = set(dezenas_obrigatorias)
-            
+            bilhete_candidato = set()
+
+            # [AJUSTE 4] Ciclo Probabilístico: 70% das vezes força todas as faltantes, 30% força apenas um subconjunto
+            if self.ciclos['estado_ciclo_atual'] == "ABERTO" and len(faltam_ciclo) <= 3:
+                if random.random() < 0.7:
+                    bilhete_candidato.update(faltam_ciclo)
+                else:
+                    qtd_incluir = max(1, random.randint(1, len(faltam_ciclo)))
+                    bilhete_candidato.update(random.sample(faltam_ciclo, qtd_incluir))
+
+            # Variabilidade de Repetições do Concurso Anterior (Sorteia entre o Top 3)
+            alvo_repeticoes = random.choice(top_repeticoes)
             disponiveis_ultimo = list(ultimo_concurso - bilhete_candidato)
             repetidas_ja_incluidas = len(bilhete_candidato.intersection(ultimo_concurso))
             faltam_repetir = alvo_repeticoes - repetidas_ja_incluidas
-            
+
             if faltam_repetir > 0 and len(disponiveis_ultimo) >= faltam_repetir:
                 escolhidas_ultimo = random.sample(disponiveis_ultimo, faltam_repetir)
                 bilhete_candidato.update(escolhidas_ultimo)
 
+            # [AJUSTE 3] Preenchimento Restante via Amostragem Ponderada por Frequência
             dezenas_restantes = list(self.dezenas_totais - bilhete_candidato)
             vagas_restantes = 15 - len(bilhete_candidato)
-            
-            if vagas_restantes > 0:
-                escolhidas_finais = random.sample(dezenas_restantes, vagas_restantes)
-                bilhete_candidato.update(escolhidas_finais)
 
-            # Converte explicitamente para inteiros nativos do Python
+            if vagas_restantes > 0:
+                pesos = np.array([freq_dict.get(n, 1) + 1.0 for n in dezenas_restantes], dtype=float)
+                pesos /= pesos.sum()
+                
+                escolhidas_finais = np.random.choice(
+                    dezenas_restantes, size=vagas_restantes, replace=False, p=pesos
+                )
+                bilhete_candidato.update([int(x) for x in escolhidas_finais])
+
             bilhete_lista = [int(x) for x in sorted(list(bilhete_candidato))]
 
+            # Submete ao Validador com Score
             aprovado, motivo = self.validador.avaliar_bilhete(bilhete_lista)
-            
-            if aprovado and bilhete_lista not in bilhetes_aprovados:
-                bilhetes_aprovados.append(bilhete_lista)
+
+            # [AJUSTE 2] Controle de Diversidade (Garante máxima intersecção permitida entre bilhetes)
+            if aprovado:
+                eh_diverso = True
+                for b_existente in bilhetes_aprovados:
+                    if len(set(bilhete_lista).intersection(set(b_existente))) > max_interseccao:
+                        eh_diverso = False
+                        break
+                
+                if eh_diverso and bilhete_lista not in bilhetes_aprovados:
+                    bilhetes_aprovados.append(bilhete_lista)
 
         return {
             "bilhetes": bilhetes_aprovados,
