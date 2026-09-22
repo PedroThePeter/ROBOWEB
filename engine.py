@@ -4,18 +4,22 @@ import random
 
 class LotofacilEngine:
     def __init__(self, df: pd.DataFrame):
+        """
+        Recebe o DataFrame de concursos ordenado cronologicamente.
+        """
         self.df = df
         self.dezenas_totais = np.arange(1, 26)
         
-        # Identifica colunas de dezenas
+        # Identifica as colunas de sorteio
         self.colunas_dezenas = [col for col in self.df.columns if 'Bola' in str(col) or 'Dezena' in str(col)]
         if not self.colunas_dezenas or len(self.colunas_dezenas) != 15:
             self.colunas_dezenas = self.df.columns[-15:]
 
     def juiz_de_frequencia(self, janela=20):
+        """1º JUIZ: Frequência recente (quentes/frias) e atrasos."""
         df_recente = self.df.tail(janela)[self.colunas_dezenas]
-        todas_bolas_sorteadas = df_recente.values.ravel()
-        frequencias_series = pd.Series(todas_bolas_sorteadas).value_counts()
+        todas_bolas = df_recente.values.ravel()
+        frequencias_series = pd.Series(todas_bolas).value_counts()
         frequencias = frequencias_series.reindex(self.dezenas_totais, fill_value=0)
 
         grid_historico_invertido = self.df[self.colunas_dezenas][::-1].values
@@ -33,6 +37,7 @@ class LotofacilEngine:
         }
 
     def juiz_de_padroes_e_ciclos(self):
+        """2º JUIZ: Monitorização de ciclos das 25 dezenas."""
         grid = self.df[self.colunas_dezenas].values
         ciclos_historico = []
         dezenas_ciclo_atual = set()
@@ -41,6 +46,7 @@ class LotofacilEngine:
         for linha in grid:
             dezenas_ciclo_atual.update(linha)
             concursos_no_ciclo_atual += 1
+            
             if len(dezenas_ciclo_atual) == 25:
                 ciclos_historico.append(concursos_no_ciclo_atual)
                 dezenas_ciclo_atual.clear()
@@ -64,36 +70,33 @@ class LotofacilEngine:
         }
 
     def juiz_de_paridade_e_primos(self):
+        """3º JUIZ: Proporção de Pares/Ímpares e Números Primos."""
         grid = self.df[self.colunas_dezenas].values
-        primos_lotofacil = np.array([2, 3, 5, 7, 11, 13, 17, 19, 23])
-
-        pares_por_concurso = np.sum(grid % 2 == 0, axis=1)
-        impares_por_concurso = 15 - pares_por_concurso
-        primos_por_concurso = np.sum(np.isin(grid, primos_lotofacil), axis=1)
-
-        dist_pares = pd.Series(pares_por_concurso).value_counts()
-        dist_primos = pd.Series(primos_por_concurso).value_counts()
-
-        top_3_padroes_pares = dist_pares.nlargest(3).index.tolist()
-        top_3_padroes_primos = dist_primos.nlargest(3).index.tolist()
-
+        primos_set = {2, 3, 5, 7, 11, 13, 17, 19, 23}
+        
+        pares_por_linha = np.sum(grid % 2 == 0, axis=1)
+        dist_pares = pd.Series(pares_por_linha).value_counts()
+        top_pares = dist_pares.nlargest(3).index.tolist()
+        
+        matriz_primos = np.isin(grid, list(primos_set))
+        primos_por_linha = np.sum(matriz_primos, axis=1)
+        dist_primos = pd.Series(primos_por_linha).value_counts()
+        top_primos = dist_primos.nlargest(3).index.tolist()
+        
         return {
-            "ultimo_concurso": {
-                "pares": int(pares_por_concurso[-1]),
-                "impares": int(impares_por_concurso[-1]),
-                "primos": int(primos_por_concurso[-1])
-            },
             "padroes_ideais": {
-                "pares_impares": [f"{p} Pares / {15-p} Ímpares" for p in top_3_padroes_pares],
-                "quantidades_primos": [int(p) for p in top_3_padroes_primos]
+                "pares_impares": [f"{p} pares / {15-p} impares" for p in top_pares],
+                "quantidades_primos": [int(p) for p in top_primos]
             },
-            "distribuicao_historica": {
-                "pares": {str(k): int(v) for k, v in dist_pares.items()},
-                "primos": {str(k): int(v) for k, v in dist_primos.items()}
+            "ultimo_concurso": {
+                "pares": int(pares_por_linha[-1]),
+                "impares": 15 - int(pares_por_linha[-1]),
+                "primos": int(primos_por_linha[-1])
             }
         }
 
     def juiz_de_soma_e_amplitude(self):
+        """4º JUIZ: Soma total e amplitude (distância min-max)."""
         grid = self.df[self.colunas_dezenas].values
         somas = np.sum(grid, axis=1)
         amplitudes = np.ptp(grid, axis=1)
@@ -122,11 +125,12 @@ class LotofacilEngine:
         }
 
     def juiz_de_sequencias_e_repeticoes(self):
+        """5º JUIZ: Repetição do concurso anterior e sequências consecutivas."""
         grid = self.df[self.colunas_dezenas].values
-        matriz_binaria = np.zeros((len(grid), 25), dtype=bool)
         
+        matriz_binaria = np.zeros((len(grid), 25), dtype=bool)
         linhas_idx = np.repeat(np.arange(len(grid)), 15)
-        colunas_idx = grid.ravel() - 1 
+        colunas_idx = grid.ravel() - 1
         matriz_binaria[linhas_idx, colunas_idx] = True
 
         repeticoes_historico = np.sum(matriz_binaria[1:] & matriz_binaria[:-1], axis=1)
@@ -137,7 +141,6 @@ class LotofacilEngine:
             max([len(seq) for seq in np.split(linha, np.where(np.diff(linha) != 1)[0] + 1)]) 
             for linha in grid
         ]
-        
         dist_sequencias = pd.Series(maiores_sequencias).value_counts()
         top_3_sequencias = dist_sequencias.nlargest(3).index.tolist()
 
@@ -157,6 +160,7 @@ class LotofacilEngine:
             }
         }
 
+
 class CuradorDeValidacao:
     def __init__(self, stats_ciclos, stats_paridade, stats_soma, stats_sequencias):
         self.ciclos = stats_ciclos
@@ -167,10 +171,9 @@ class CuradorDeValidacao:
 
     def avaliar_bilhete(self, bilhete: list) -> tuple:
         if len(set(bilhete)) != 15:
-            return False, "O bilhete não contém 15 dezenas únicas."
+            return False, "Rejeitado: O bilhete não contém 15 dezenas únicas."
 
         bilhete_set = set(bilhete)
-        
         qtd_pares = sum(1 for x in bilhete if x % 2 == 0)
         qtd_impares = 15 - qtd_pares
         qtd_primos = len(bilhete_set.intersection(self.primos_oficiais))
@@ -190,30 +193,31 @@ class CuradorDeValidacao:
 
         pares_aceites = [int(p.split()[0]) for p in self.paridade['padroes_ideais']['pares_impares']]
         if qtd_pares not in pares_aceites:
-            return False, f"Proporção {qtd_pares} Pares / {qtd_impares} Ímpares improvável."
+            return False, f"Rejeitado: Proporção {qtd_pares} Pares / {qtd_impares} Ímpares estatisticamente improvável."
 
         primos_aceites = self.paridade['padroes_ideais']['quantidades_primos']
         if qtd_primos not in primos_aceites:
-            return False, f"Quantidade de primos ({qtd_primos}) foge do padrão."
+            return False, f"Rejeitado: {qtd_primos} dezenas primas foge do padrão histórico."
 
         soma_min, soma_max = self.soma['padroes_ideais']['soma_margem_seguranca']
         if not (soma_min <= soma_total <= soma_max):
-            return False, f"Soma total ({soma_total}) fora da margem aceitável."
+            return False, f"Rejeitado: Soma total ({soma_total}) fora da margem aceitável ({soma_min} a {soma_max})."
 
         repeticoes_aceites = self.sequencias['padroes_ideais']['top_3_quantidades_repetidas']
         if qtd_repetidas not in repeticoes_aceites:
-            return False, f"Repetições do anterior ({qtd_repetidas}) fora do padrão."
+            return False, f"Rejeitado: {qtd_repetidas} repetições do anterior (O padrão exige {repeticoes_aceites})."
 
         seqs_aceites = self.sequencias['padroes_ideais']['top_3_tamanhos_sequencia']
         if max_seq > max(seqs_aceites):
-            return False, f"Sequência consecutiva muito longa ({max_seq})."
+            return False, f"Rejeitado: Anomalia sequencial. Sequência de {max_seq} dezenas seguidas é arriscada."
 
         faltam = self.ciclos['dezenas_faltantes_para_fechar']
         if self.ciclos['estado_ciclo_atual'] == "ABERTO" and len(faltam) <= 3:
             if not set(faltam).issubset(bilhete_set):
-                return False, f"Ignorou dezenas maduras de fim de ciclo."
+                return False, f"Rejeitado: Ignorou as dezenas maduras do fim do ciclo: {faltam}."
 
-        return True, "Diamante Estatístico"
+        return True, "Aprovado: Bilhete Diamante Estatístico."
+
 
 class CuradorDeSelecaoFinal:
     def __init__(self, validador, stats_frequencia, stats_ciclos, stats_sequencias):
@@ -226,8 +230,8 @@ class CuradorDeSelecaoFinal:
     def gerar_bilhetes_diamante(self, quantidade=3, max_tentativas=10000):
         bilhetes_aprovados = []
         tentativas = 0
+
         dezenas_obrigatorias = set()
-        
         faltam_ciclo = self.ciclos['dezenas_faltantes_para_fechar']
         if self.ciclos['estado_ciclo_atual'] == "ABERTO" and len(faltam_ciclo) <= 3:
             dezenas_obrigatorias.update(faltam_ciclo)
@@ -255,7 +259,7 @@ class CuradorDeSelecaoFinal:
                 bilhete_candidato.update(escolhidas_finais)
 
             bilhete_lista = sorted(list(bilhete_candidato))
-            aprovado, _ = self.validador.avaliar_bilhete(bilhete_lista)
+            aprovado, motivo = self.validador.avaliar_bilhete(bilhete_lista)
             
             if aprovado and bilhete_lista not in bilhetes_aprovados:
                 bilhetes_aprovados.append(bilhete_lista)
