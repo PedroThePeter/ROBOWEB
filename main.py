@@ -1,6 +1,7 @@
 import os
 import glob
 import traceback
+import numpy as np
 import pandas as pd
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -12,6 +13,26 @@ CORS(app)
 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# ==========================================
+# SANITIZADOR DE TIPOS NUMPY PARA JSON
+# ==========================================
+def sanitize_for_json(data):
+    """
+    Converte recursivamente tipos NumPy (int64, float64, arrays) 
+    para tipos nativos do Python que o jsonify consegue serializar.
+    """
+    if isinstance(data, dict):
+        return {str(k): sanitize_for_json(v) for k, v in data.items()}
+    elif isinstance(data, (list, tuple, set)):
+        return [sanitize_for_json(v) for v in data]
+    elif isinstance(data, (np.integer, np.int64, np.int32)):
+        return int(data)
+    elif isinstance(data, (np.floating, np.float64, np.float32)):
+        return float(data)
+    elif isinstance(data, np.ndarray):
+        return data.tolist()
+    return data
 
 # ==========================================
 # CONFIGURAÇÃO SUPABASE
@@ -86,24 +107,25 @@ def gerar_palpites():
         if len(resultado_geracao["bilhetes"]) == 0:
             return jsonify({"error": "Filtros demasiado restritos. Nenhum bilhete sobreviveu ao Validador."}), 500
 
-        # Formata para o Frontend React consumir
+        # Formata os palpites garantindo inteiros nativos Python
         palpites_finais = {
-            f"curador{i+1}": bilhete 
+            f"curador{i+1}": [int(n) for n in bilhete]
             for i, bilhete in enumerate(resultado_geracao["bilhetes"])
         }
 
-        return jsonify({
+        resposta = {
             "status": "sucesso",
             "palpites": palpites_finais,
-            "concurso": concurso_alvo,
+            "concurso": int(concurso_alvo),
             "metricas_ia": {
-                "tentativas_processadas": resultado_geracao["tentativas_gastas"],
-                "taxa_aprovacao_validador": resultado_geracao["eficiencia"]
+                "tentativas_processadas": int(resultado_geracao["tentativas_gastas"]),
+                "taxa_aprovacao_validador": str(resultado_geracao["eficiencia"])
             }
-        })
+        }
+
+        return jsonify(sanitize_for_json(resposta))
 
     except Exception as e:
-        # AQUI ESTÁ A MAGIA DE DEBUG
         print("\n" + "="*50)
         print("🚨 ERRO FATAL NO MOTOR AI 🚨")
         print(traceback.format_exc())
@@ -124,7 +146,7 @@ def salvar_bilhetes():
         return jsonify({"error": "Dados incompletos para salvar."}), 400
 
     registros = [
-        {"concurso": concurso, "curador": curador, "dezenas": dezenas}
+        {"concurso": int(concurso), "curador": curador, "dezenas": [int(n) for n in dezenas]}
         for curador, dezenas in palpites.items()
     ]
     
@@ -179,18 +201,18 @@ def auditar_resultado(concurso_alvo):
             resultados_auditoria.append({
                 "curador": bilhete['curador'],
                 "acertos": acertos,
-                "dezenas_sorteadas": list(dezenas_sorteadas),
-                "dezenas_apostadas": list(dezenas_apostadas)
+                "dezenas_sorteadas": [int(n) for n in dezenas_sorteadas],
+                "dezenas_apostadas": [int(n) for n in dezenas_apostadas]
             })
             
-        return jsonify({
+        resposta = {
             "status": "sucesso",
-            "concurso": concurso_alvo,
+            "concurso": int(concurso_alvo),
             "resultados": resultados_auditoria
-        })
+        }
+        return jsonify(sanitize_for_json(resposta))
 
     except Exception as e:
-        # AQUI ESTÁ A MAGIA DE DEBUG
         print("\n" + "="*50)
         print("🚨 ERRO FATAL NA AUDITORIA 🚨")
         print(traceback.format_exc())
