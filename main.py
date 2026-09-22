@@ -6,7 +6,7 @@ from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
 app = Flask(__name__)
 
-# Libera CORS globalmente para evitar erros de bloqueio Vercel <-> Render
+# Configuração global de CORS para permitir requisições da Vercel
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 DF_LOTOFACIL = None
@@ -14,11 +14,14 @@ DF_LOTOFACIL = None
 def carregar_dados_iniciais():
     """
     Carrega automaticamente a planilha de histórico do projeto se ela existir na raiz.
+    Inclui variações de maiúsculas e minúsculas para compatibilidade com Linux (Render).
     """
     global DF_LOTOFACIL
     caminhos_possiveis = [
         'lotofacil.xlsx', 
+        'Lotofacil.xlsx', 
         'lotofacil.csv', 
+        'Lotofacil.csv', 
         'base_lotofacil.xlsx', 
         'base_lotofacil.csv'
     ]
@@ -26,7 +29,7 @@ def carregar_dados_iniciais():
     for caminho in caminhos_possiveis:
         if os.path.exists(caminho):
             try:
-                if caminho.endswith('.xlsx') or caminho.endswith('.xls'):
+                if caminho.lower().endswith(('.xlsx', '.xls')):
                     DF_LOTOFACIL = pd.read_excel(caminho)
                 else:
                     DF_LOTOFACIL = pd.read_csv(caminho)
@@ -42,7 +45,7 @@ carregar_dados_iniciais()
 
 
 # ==========================================
-# ROTAS DA API (Aceitam rotas com ou sem /api)
+# ROTAS DA API (Suporte a chamadas com ou sem /api)
 # ==========================================
 
 @app.route('/status', methods=['GET'])
@@ -76,9 +79,9 @@ def upload_dados():
         return jsonify({"erro": "Nome de arquivo inválido."}), 400
 
     try:
-        if file.filename.endswith('.xlsx') or file.filename.endswith('.xls'):
+        if file.filename.lower().endswith(('.xlsx', '.xls')):
             DF_LOTOFACIL = pd.read_excel(file)
-        elif file.filename.endswith('.csv'):
+        elif file.filename.lower().endswith('.csv'):
             DF_LOTOFACIL = pd.read_csv(file)
         else:
             return jsonify({"erro": "Formato inválido. Envie um arquivo .xlsx ou .csv"}), 400
