@@ -1,23 +1,27 @@
 import os
 import glob
+import traceback
 import pandas as pd
-import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from supabase import create_client, Client
 from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
 app = Flask(__name__)
-
-# --- CONFIGURAÇÃO DE CORS BLINDADA PARA A VERCEL ---
-# Permite que qualquer link de preview ou produção da Vercel aceda à API sem bloqueios
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+CORS(app)
 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# --- CONFIGURAÇÃO SUPABASE (VIA REST API) ---
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
+# ==========================================
+# CONFIGURAÇÃO SUPABASE
+# ==========================================
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 @app.route('/')
 def home():
@@ -42,23 +46,24 @@ def upload_file():
         return jsonify({"error": f"Erro ao ler Excel: {str(e)}"}), 500
 
     return jsonify({
-        "message": "Base atualizada com sucesso!",
+        "message": "Ficheiro carregado com sucesso!",
         "filename": file.filename,
         "total_concursos": total_linhas
     })
 
 @app.route('/api/gerar_palpites', methods=['POST'])
 def gerar_palpites():
-    dados = request.get_json() or {}
-    concurso_alvo = dados.get('concurso_alvo', 0)
-    
-    arquivos_excel = glob.glob(os.path.join(UPLOAD_FOLDER, '*.xlsx'))
-    if not arquivos_excel:
-        return jsonify({"error": "Base de dados não encontrada. Faça upload do Excel."}), 400
-    
     try:
+        dados = request.get_json() or {}
+        concurso_alvo = dados.get('concurso_alvo', 0)
+        
+        arquivos_excel = glob.glob(os.path.join(UPLOAD_FOLDER, '*.xlsx'))
+        if not arquivos_excel:
+            return jsonify({"error": "Base de dados não encontrada. Faça upload do Excel."}), 400
+        
         df = pd.read_excel(arquivos_excel[0])
         
+        # 1. Convoca os 5 Juízes
         motor = LotofacilEngine(df)
         stats_frequencia = motor.juiz_de_frequencia(janela=20)
         stats_ciclos = motor.juiz_de_padroes_e_ciclos()
@@ -66,6 +71,7 @@ def gerar_palpites():
         stats_soma = motor.juiz_de_soma_e_amplitude()
         stats_sequencias = motor.juiz_de_sequencias_e_repeticoes()
 
+        # 2. Instancia a IA de Decisão (Os Curadores)
         validador = CuradorDeValidacao(
             stats_ciclos, stats_paridade, stats_soma, stats_sequencias
         )
@@ -74,11 +80,13 @@ def gerar_palpites():
             validador, stats_frequencia, stats_ciclos, stats_sequencias
         )
 
+        # 3. Gera 3 Bilhetes Diamante
         resultado_geracao = gerador.gerar_bilhetes_diamante(quantidade=3)
 
         if len(resultado_geracao["bilhetes"]) == 0:
             return jsonify({"error": "Filtros demasiado restritos. Nenhum bilhete sobreviveu ao Validador."}), 500
 
+        # Formata para o Frontend React consumir
         palpites_finais = {
             f"curador{i+1}": bilhete 
             for i, bilhete in enumerate(resultado_geracao["bilhetes"])
@@ -95,12 +103,18 @@ def gerar_palpites():
         })
 
     except Exception as e:
+        # AQUI ESTÁ A MAGIA DE DEBUG
+        print("\n" + "="*50)
+        print("🚨 ERRO FATAL NO MOTOR AI 🚨")
+        print(traceback.format_exc())
+        print("="*50 + "\n")
         return jsonify({"error": f"Erro interno do Motor AI: {str(e)}"}), 500
+
 
 @app.route('/api/salvar_bilhetes', methods=['POST'])
 def salvar_bilhetes():
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        return jsonify({"error": "Supabase não está configurado."}), 500
+    if not supabase:
+        return jsonify({"error": "Supabase não está configurado no servidor."}), 500
         
     dados = request.json or {}
     concurso = dados.get("concurso")
@@ -114,41 +128,25 @@ def salvar_bilhetes():
         for curador, dezenas in palpites.items()
     ]
     
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal"
-    }
-    url = f"{SUPABASE_URL}/rest/v1/bilhetes_gerados"
-    
     try:
-        response = requests.post(url, json=registros, headers=headers)
-        if response.status_code in [200, 201]:
-            return jsonify({"status": "sucesso", "mensagem": f"Bilhetes do concurso {concurso} salvos!"})
-        else:
-            return jsonify({"error": f"Erro do Supabase: {response.text}"}), 500
+        supabase.table("bilhetes_gerados").insert(registros).execute()
+        return jsonify({"status": "sucesso", "mensagem": f"Bilhetes do concurso {concurso} salvos com sucesso!"})
     except Exception as e:
+        print("\n" + "="*50)
+        print("🚨 ERRO AO SALVAR NO SUPABASE 🚨")
+        print(traceback.format_exc())
+        print("="*50 + "\n")
         return jsonify({"error": f"Erro ao salvar no banco: {str(e)}"}), 500
+
 
 @app.route('/api/auditar/<int:concurso_alvo>', methods=['GET'])
 def auditar_resultado(concurso_alvo):
-    if not SUPABASE_URL or not SUPABASE_KEY:
+    if not supabase:
         return jsonify({"error": "Supabase não configurado."}), 500
         
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json"
-    }
-    url = f"{SUPABASE_URL}/rest/v1/bilhetes_gerados?concurso=eq.{concurso_alvo}"
-    
     try:
-        res_db = requests.get(url, headers=headers)
-        if res_db.status_code != 200:
-            return jsonify({"error": f"Erro ao buscar no Supabase: {res_db.text}"}), 500
-            
-        bilhetes_salvos = res_db.json()
+        res_db = supabase.table("bilhetes_gerados").select("*").eq("concurso", concurso_alvo).execute()
+        bilhetes_salvos = res_db.data
         
         if not bilhetes_salvos:
             return jsonify({"error": f"Nenhum palpite salvo para o concurso {concurso_alvo}."}), 404
@@ -165,7 +163,7 @@ def auditar_resultado(concurso_alvo):
             
         linha_resultado = df[df[col_concurso[0]] == concurso_alvo]
         if linha_resultado.empty:
-            return jsonify({"error": f"O resultado do concurso {concurso_alvo} ainda não existe no Excel."}), 404
+            return jsonify({"error": f"O resultado do concurso {concurso_alvo} ainda não foi adicionado ao Excel."}), 404
             
         colunas_dezenas = [col for col in df.columns if 'Bola' in str(col) or 'Dezena' in str(col)]
         if not colunas_dezenas or len(colunas_dezenas) != 15:
@@ -192,7 +190,12 @@ def auditar_resultado(concurso_alvo):
         })
 
     except Exception as e:
-        return jsonify({"error": f"Erro na auditoria: {str(e)}"}), 500
+        # AQUI ESTÁ A MAGIA DE DEBUG
+        print("\n" + "="*50)
+        print("🚨 ERRO FATAL NA AUDITORIA 🚨")
+        print(traceback.format_exc())
+        print("="*50 + "\n")
+        return jsonify({"error": f"Erro interno na auditoria: {str(e)}"}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
