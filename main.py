@@ -8,9 +8,9 @@ from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
 app = Flask(__name__)
 
-# --- CONFIGURAÇÃO DE SEGURANÇA E CORS ---
-URL_FRONTEND = os.environ.get("URL_FRONTEND", "https://seu-projeto.vercel.app")
-CORS(app, resources={r"/api/*": {"origins": URL_FRONTEND}})
+# --- CONFIGURAÇÃO DE CORS BLINDADA PARA A VERCEL ---
+# Permite que qualquer link de preview ou produção da Vercel aceda à API sem bloqueios
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
