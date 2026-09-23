@@ -9,7 +9,7 @@ from pydantic import BaseModel
 # Importação dos módulos do motor estatístico
 from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
-app = FastAPI(title="Lotofácil Engine API", version="2.2")
+app = FastAPI(title="Lotofácil Engine API", version="2.3")
 
 # Configuração global de CORS
 app.add_middleware(
@@ -72,10 +72,14 @@ def gerar_jogos(req: RequisicaoGerarJogos):
         score = req.score_minimo if req.score_minimo is not None else 80
         interseccao = req.max_interseccao if req.max_interseccao is not None else 12
 
-        validador = CuradorDeValidacao(engine=engine, score_minimo=score)
-        gerador = CuradorDeSelecaoFinal(engine=engine, validador=validador)
+        # Correção: Ajustado para instanciar os curadores sem o argumento 'engine', 
+        # repassando o objeto engine diretamente ou da forma esperada pelo engine.py
+        validador = CuradorDeValidacao(score_minimo=score)
+        gerador = CuradorDeSelecaoFinal(validador=validador)
         
+        # Se o seu gerador precisar do engine na chamada do método, ajustamos aqui:
         resultado = gerador.gerar_bilhetes_diamante(
+            engine=engine,
             quantidade=qtd, 
             max_interseccao=interseccao
         )
@@ -83,7 +87,7 @@ def gerar_jogos(req: RequisicaoGerarJogos):
     except Exception as e:
         raise HTTPException(
             status_code=400, 
-            detail=f"Falha na geração dos bilhetes: {str(e)}"
+            detail=f"Falha na geração dos jogos: {str(e)}"
         )
 
 
