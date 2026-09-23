@@ -9,6 +9,7 @@ export default function App() {
   const [loadingRecarregar, setLoadingRecarregar] = useState(false);
   
   const [quantidade, setQuantidade] = useState(1);
+  const [scoreMinimo, setScoreMinimo] = useState(90);
   const [jogosGerados, setJogosGerados] = useState([]);
   const [mensagemErro, setMensagemErro] = useState("");
   const [mensagemSucesso, setMensagemSucesso] = useState("");
@@ -65,15 +66,13 @@ export default function App() {
     try {
       const payload = {
         quantidade: parseInt(quantidade, 10) || 1,
-        score_minimo: 80,
+        score_minimo: parseInt(scoreMinimo, 10) || 90,
         max_interseccao: 12
       };
 
       const response = await fetch(`${API_BASE}/api/gerar-jogos`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
 
@@ -84,7 +83,7 @@ export default function App() {
       }
 
       setJogosGerados(Array.isArray(data) ? data : [data]);
-      setMensagemSucesso("Bilhete Diamante gerado com sucesso!");
+      setMensagemSucesso("Bilhete Diamante de Alta Performance gerado!");
     } catch (err) {
       setMensagemErro(err.message);
     } finally {
@@ -96,7 +95,7 @@ export default function App() {
     <div style={{ maxWidth: "1000px", margin: "0 auto", padding: "20px", fontFamily: "sans-serif" }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
-        <h2>💎 Lotofácil Engine - Inteligência Estatística</h2>
+        <h2>💎 Lotofácil Engine v3.0 - Alta Rigorosidade</h2>
         <div>
           <span style={{ marginRight: "10px", fontWeight: "bold" }}>
             API: {loadingStats ? "Carregando..." : estatisticas ? "🟢 Online" : "🔴 Offline"}
@@ -106,7 +105,6 @@ export default function App() {
             onClick={handleRecarregarBase} 
             disabled={loadingRecarregar}
             style={{ marginLeft: "15px", padding: "8px 12px", cursor: "pointer", backgroundColor: "#334155", color: "#fff", border: "none", borderRadius: "4px" }}
-            title="Atualiza a leitura após enviar uma nova planilha Lotofacil.xlsx"
           >
             {loadingRecarregar ? "Atualizando..." : "📂 Recarregar Planilha Local"}
           </button>
@@ -131,7 +129,7 @@ export default function App() {
       ) : estatisticas ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "15px", marginBottom: "30px" }}>
           <div style={{ border: "1px solid #ccc", padding: "15px", borderRadius: "8px" }}>
-            <h4>1. Frequência (Top 20)</h4>
+            <h4>1. Frequência (Top 10)</h4>
             <p><strong>Quentes:</strong> {Array.isArray(estatisticas.frequencia?.quentes) ? estatisticas.frequencia.quentes.join(", ") : "N/A"}</p>
           </div>
           <div style={{ border: "1px solid #ccc", padding: "15px", borderRadius: "8px" }}>
@@ -147,24 +145,37 @@ export default function App() {
 
       {/* Gerador de Jogos */}
       <div style={{ border: "1px solid #1e40af", padding: "20px", borderRadius: "8px", backgroundColor: "#f0f9ff" }}>
-        <h3>🚀 Gerador Inteligente (Juízes + Curadores)</h3>
-        <div style={{ marginBottom: "15px" }}>
-          <label style={{ marginRight: "10px" }}>Quantidade de Bilhetes:</label>
-          <input 
-            type="number" 
-            min="1" 
-            max="10" 
-            value={quantidade} 
-            onChange={(e) => setQuantidade(e.target.value)}
-            style={{ width: "60px", padding: "5px" }}
-          />
+        <h3>🚀 Gerador Inteligente (Juízes + Curadores v3.0)</h3>
+        <div style={{ display: "flex", gap: "20px", marginBottom: "15px", flexWrap: "wrap" }}>
+          <div>
+            <label style={{ marginRight: "10px" }}>Quantidade:</label>
+            <input 
+              type="number" 
+              min="1" 
+              max="10" 
+              value={quantidade} 
+              onChange={(e) => setQuantidade(e.target.value)}
+              style={{ width: "60px", padding: "5px" }}
+            />
+          </div>
+          <div>
+            <label style={{ marginRight: "10px" }}>Score Mínimo (Rigor):</label>
+            <input 
+              type="number" 
+              min="80" 
+              max="100" 
+              value={scoreMinimo} 
+              onChange={(e) => setScoreMinimo(e.target.value)}
+              style={{ width: "70px", padding: "5px" }}
+            />
+          </div>
         </div>
         <button 
           onClick={handleGerarJogos} 
           disabled={loadingGerar}
           style={{ padding: "10px 20px", backgroundColor: "#1e40af", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer" }}
         >
-          {loadingGerar ? "Processando Curadoria..." : "💎 Gerar Bilhete Diamante"}
+          {loadingGerar ? "Processando Curadoria Rigorosa..." : "💎 Gerar Bilhete Diamante"}
         </button>
       </div>
 
@@ -173,7 +184,6 @@ export default function App() {
         <div style={{ marginTop: "30px" }}>
           <h3>🎟️ Bilhetes Gerados</h3>
           {jogosGerados.map((item, index) => {
-            // Extrai as dezenas de forma inteligente, seja formato de lista simples ou estrutura interna de bilhetes
             const dezenasLista = item.bilhetes && Array.isArray(item.bilhetes[0]) 
               ? item.bilhetes[0] 
               : Array.isArray(item.dezenas) 
@@ -187,7 +197,7 @@ export default function App() {
                 </p>
                 {item.tentativas_gastas !== undefined && (
                   <p style={{ margin: "5px 0 0 0", color: "#374151" }}>
-                    <small>Tentativas gastas: {item.tentativas_gastas} | Eficiência: {item.eficiencia || "N/A"}</small>
+                    <small>⚡ Tentativas gastas: <strong>{item.tentativas_gastas}</strong> | Taxa de Eficiência: <strong>{item.eficiencia || "N/A"}</strong></small>
                   </p>
                 )}
               </div>

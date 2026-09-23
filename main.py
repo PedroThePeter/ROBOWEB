@@ -8,7 +8,7 @@ from pydantic import BaseModel
 # Importação dos módulos do motor estatístico
 from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
-app = FastAPI(title="Lotofácil Engine API", version="2.7")
+app = FastAPI(title="Lotofácil Engine API", version="3.0")
 
 # Configuração global de CORS
 app.add_middleware(
@@ -32,10 +32,10 @@ def carregar_engine():
 engine, df_lotofacil = carregar_engine()
 
 
-# Modelo de dados com tipos opcionais e fallbacks seguros
+# Modelo de dados com tipos opcionais e score mínimo padrão elevado para 90
 class RequisicaoGerarJogos(BaseModel):
     quantidade: Optional[int] = 1
-    score_minimo: Optional[int] = 80
+    score_minimo: Optional[int] = 90
     max_interseccao: Optional[int] = 12
 
 
@@ -43,7 +43,7 @@ class RequisicaoGerarJogos(BaseModel):
 def home():
     return {
         "status": "online",
-        "mensagem": "Lotofácil Engine API operacional (Modo Planilha Local).",
+        "mensagem": "Lotofácil Engine API v3.0 operacional (Alta Rigorosidade Estatística).",
         "concursos_carregados": len(engine.df)
     }
 
@@ -68,17 +68,16 @@ def obter_estatisticas():
 def gerar_jogos(req: RequisicaoGerarJogos):
     try:
         qtd = req.quantidade if req.quantidade is not None else 1
-        score = req.score_minimo if req.score_minimo is not None else 80
+        score = req.score_minimo if req.score_minimo is not None else 90
         interseccao = req.max_interseccao if req.max_interseccao is not None else 12
 
-        # Extração de todas as estatísticas exigidas pelos curadores
+        # Extração de todas as estatísticas para os Curadores
         stats_frequencia = engine.juiz_de_frequencia()
         stats_ciclos = engine.juiz_de_padroes_e_ciclos()
         stats_paridade = engine.juiz_de_paridade_e_primos()
         stats_soma = engine.juiz_de_soma_e_amplitude()
         stats_sequencias = engine.juiz_de_sequencias_e_repeticoes()
 
-        # Instanciação do Curador de Validação
         validador = CuradorDeValidacao(
             stats_ciclos=stats_ciclos,
             stats_paridade=stats_paridade,
@@ -87,7 +86,6 @@ def gerar_jogos(req: RequisicaoGerarJogos):
             score_minimo=score
         )
         
-        # Instanciação do Curador de Seleção Final com os parâmetros exigidos pelo __init__
         gerador = CuradorDeSelecaoFinal(
             validador=validador,
             stats_frequencia=stats_frequencia,
@@ -95,7 +93,6 @@ def gerar_jogos(req: RequisicaoGerarJogos):
             stats_sequencias=stats_sequencias
         )
         
-        # Execução da geração de bilhetes (removido o argumento 'engine=')
         resultado = gerador.gerar_bilhetes_diamante(
             quantidade=qtd, 
             max_interseccao=interseccao
@@ -110,9 +107,6 @@ def gerar_jogos(req: RequisicaoGerarJogos):
 
 @app.post("/api/recarregar-base")
 def recarregar_base_local():
-    """
-    Força a releitura do arquivo Lotofacil.xlsx atualizado no servidor
-    """
     global engine, df_lotofacil
     try:
         if os.path.exists(NOME_ARQUIVO):
