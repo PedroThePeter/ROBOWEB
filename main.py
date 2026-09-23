@@ -8,7 +8,7 @@ from pydantic import BaseModel
 # Importação dos módulos do motor estatístico
 from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
-app = FastAPI(title="Lotofácil Engine API", version="2.5")
+app = FastAPI(title="Lotofácil Engine API", version="2.6")
 
 # Configuração global de CORS
 app.add_middleware(
@@ -71,12 +71,14 @@ def gerar_jogos(req: RequisicaoGerarJogos):
         score = req.score_minimo if req.score_minimo is not None else 80
         interseccao = req.max_interseccao if req.max_interseccao is not None else 12
 
-        # Extração das estatísticas exigidas pelo __init__ do CuradorDeValidacao
+        # Extração de todas as estatísticas exigidas pelos curadores
+        stats_frequencia = engine.juiz_de_frequencia()
         stats_ciclos = engine.juiz_de_padroes_e_ciclos()
         stats_paridade = engine.juiz_de_paridade_e_primos()
         stats_soma = engine.juiz_de_soma_e_amplitude()
         stats_sequencias = engine.juiz_de_sequencias_e_repeticoes()
 
+        # Instanciação do Curador de Validação
         validador = CuradorDeValidacao(
             stats_ciclos=stats_ciclos,
             stats_paridade=stats_paridade,
@@ -85,8 +87,15 @@ def gerar_jogos(req: RequisicaoGerarJogos):
             score_minimo=score
         )
         
-        gerador = CuradorDeSelecaoFinal(validador=validador)
+        # Instanciação do Curador de Seleção Final com os parâmetros exigidos pelo __init__
+        gerador = CuradorDeSelecaoFinal(
+            validador=validador,
+            stats_frequencia=stats_frequencia,
+            stats_ciclos=stats_ciclos,
+            stats_sequencias=stats_sequencias
+        )
         
+        # Execução da geração de bilhetes
         resultado = gerador.gerar_bilhetes_diamante(
             engine=engine,
             quantidade=qtd, 
