@@ -207,6 +207,30 @@ class LotofacilEngine:
             }
         }
 
+# ====================================================
+    # FUNÇÕES DE AUDITORIA INDIVIDUAL (Usadas pelo Curador 3)
+    # ====================================================
+    
+    def contar_pares_impares(self, bilhete):
+        pares = sum(1 for x in bilhete if x % 2 == 0)
+        impares = 15 - pares
+        return pares, impares
+
+    def contar_primos(self, bilhete):
+        primos_oficiais = {2, 3, 5, 7, 11, 13, 17, 19, 23}
+        primos = sum(1 for x in bilhete if x in primos_oficiais)
+        return primos
+
+    def contar_moldura_miolo(self, bilhete):
+        moldura_oficial = {1, 2, 3, 4, 5, 6, 10, 11, 15, 16, 20, 21, 22, 23, 24, 25}
+        moldura = sum(1 for x in bilhete if x in moldura_oficial)
+        miolo = 15 - moldura
+        return moldura, miolo
+
+
+class CuradorDeValidacao:
+    def __init__(self, stats_ciclos, stats_paridade, stats_soma, stats_sequencias, stats_moldura=None, score_minimo=80):
+        # ... (resto do código da classe CuradorDeValidacao)
 
 class CuradorDeValidacao:
     def __init__(self, stats_ciclos, stats_paridade, stats_soma, stats_sequencias, stats_moldura=None, score_minimo=80):
