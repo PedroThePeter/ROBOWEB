@@ -207,7 +207,7 @@ class LotofacilEngine:
             }
         }
 
-# ====================================================
+    # ====================================================
     # FUNÇÕES DE AUDITORIA INDIVIDUAL (Usadas pelo Curador 3)
     # ====================================================
     
@@ -227,10 +227,6 @@ class LotofacilEngine:
         miolo = 15 - moldura
         return moldura, miolo
 
-
-class CuradorDeValidacao:
-    def __init__(self, stats_ciclos, stats_paridade, stats_soma, stats_sequencias, stats_moldura=None, score_minimo=80):
-        # ... (resto do código da classe CuradorDeValidacao)
 
 class CuradorDeValidacao:
     def __init__(self, stats_ciclos, stats_paridade, stats_soma, stats_sequencias, stats_moldura=None, score_minimo=80):
