@@ -8,7 +8,7 @@ from pydantic import BaseModel
 # Importação dos módulos do motor estatístico
 from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
-app = FastAPI(title="Lotofácil Engine API", version="2.6")
+app = FastAPI(title="Lotofácil Engine API", version="2.7")
 
 # Configuração global de CORS
 app.add_middleware(
@@ -95,9 +95,8 @@ def gerar_jogos(req: RequisicaoGerarJogos):
             stats_sequencias=stats_sequencias
         )
         
-        # Execução da geração de bilhetes
+        # Execução da geração de bilhetes (removido o argumento 'engine=')
         resultado = gerador.gerar_bilhetes_diamante(
-            engine=engine,
             quantidade=qtd, 
             max_interseccao=interseccao
         )
