@@ -168,16 +168,31 @@ export default function App() {
         </button>
       </div>
 
-      {/* Exibição dos Jogos */}
+      {/* Exibição Formatada dos Jogos */}
       {jogosGerados.length > 0 && (
         <div style={{ marginTop: "30px" }}>
           <h3>🎟️ Bilhetes Gerados</h3>
-          {jogosGerados.map((jogo, index) => (
-            <div key={index} style={{ border: "1px solid #22c55e", padding: "15px", borderRadius: "8px", marginBottom: "10px", backgroundColor: "#f0fdf4" }}>
-              <p><strong>Bilhete {index + 1}:</strong> {Array.isArray(jogo.dezenas) ? jogo.dezenas.join(" - ") : JSON.stringify(jogo)}</p>
-              {jogo.score && <p><small>Score de Validação: {jogo.score} pontos</small></p>}
-            </div>
-          ))}
+          {jogosGerados.map((item, index) => {
+            // Extrai as dezenas de forma inteligente, seja formato de lista simples ou estrutura interna de bilhetes
+            const dezenasLista = item.bilhetes && Array.isArray(item.bilhetes[0]) 
+              ? item.bilhetes[0] 
+              : Array.isArray(item.dezenas) 
+                ? item.dezenas 
+                : Array.isArray(item) ? item : [];
+
+            return (
+              <div key={index} style={{ border: "1px solid #22c55e", padding: "15px", borderRadius: "8px", marginBottom: "10px", backgroundColor: "#f0fdf4" }}>
+                <p style={{ fontSize: "16px", fontWeight: "bold", color: "#166534" }}>
+                  Bilhete {index + 1}: {dezenasLista.length > 0 ? dezenasLista.join(" - ") : JSON.stringify(item)}
+                </p>
+                {item.tentativas_gastas !== undefined && (
+                  <p style={{ margin: "5px 0 0 0", color: "#374151" }}>
+                    <small>Tentativas gastas: {item.tentativas_gastas} | Eficiência: {item.eficiencia || "N/A"}</small>
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
