@@ -10,7 +10,7 @@ from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
 app = FastAPI(title="Lotofácil Engine API", version="2.0")
 
-# Configuração de CORS para permitir requisições do app.jsx (React)
+# Configuração global de CORS para permitir requisições da Vercel ou qualquer origem
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,6 +42,16 @@ class RequisicaoGerarJogos(BaseModel):
 
 # --- ROTAS DA API ---
 
+@app.get("/")
+def home():
+    """Rota raiz para verificação rápida de status do servidor"""
+    return {
+        "status": "online",
+        "mensagem": "Lotofácil Engine API está em execução.",
+        "concursos_carregados": len(engine.df)
+    }
+
+
 @app.get("/api/estatisticas")
 def obter_estatisticas():
     """Retorna o relatório resumido dos 6 Juízes para a interface React"""
@@ -69,9 +79,6 @@ def gerar_jogos(req: RequisicaoGerarJogos):
     return resultado
 
 
-# =========================================================================
-# SOLUÇÃO 1: ATUALIZAÇÃO AUTOMÁTICA VIA API DA CAIXA
-# =========================================================================
 @app.post("/api/atualizar-base")
 def atualizar_base_caixa():
     """
@@ -81,23 +88,28 @@ def atualizar_base_caixa():
     global engine, df_lotofacil
     
     try:
-        # 1. Consulta a API pública da Caixa Econômica Federal
         url_caixa = "https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil"
         
-        # O parâmetro verify=False evita travamentos por certificado SSL do servidor governamental
-        response = requests.get(url_caixa, timeout=10, verify=False)
+        # Cabeçalhos HTTP para simular um navegador real e evitar bloqueios em nuvens como o Render
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
+        }
+        
+        response = requests.get(url_caixa, headers=headers, timeout=15, verify=False)
         
         if response.status_code != 200:
-            raise HTTPException(
-                status_code=500, 
-                detail="Não foi possível conectar ao servidor da Caixa."
-            )
+            return {
+                "sucesso": False,
+                "mensagem": f"O servidor da Caixa retornou o código de erro {response.status_code}."
+            }
             
         dados_caixa = response.json()
         ultimo_concurso_caixa = dados_caixa["numero"]
         dezenas_sorteadas = [int(d) for d in dados_caixa["listaDezenas"]]
         
-        # 2. Verifica o concurso mais atual gravado na planilha local
+        # Verifica o concurso mais atual gravado na planilha local
         if "Concurso" in df_lotofacil.columns:
             ultimo_concurso_local = int(df_lotofacil["Concurso"].max())
         else:
@@ -112,18 +124,16 @@ def atualizar_base_caixa():
                 "novo_sorteio_adicionado": False
             }
 
-        # 3. Monta a nova linha de dados mantendo a estrutura da planilha
+        # Monta a nova linha de dados mantendo a estrutura da planilha
         nova_linha = {"Concurso": ultimo_concurso_caixa}
-        
-        # Estrutura padrão de colunas Bola1 a Bola15 com as dezenas sorteadas
         for idx, dezena in enumerate(sorted(dezenas_sorteadas), start=1):
             nova_linha[f"Bola{idx}"] = dezena
 
-        # 4. Concatena e salva de volta no arquivo Excel
+        # Concatena e salva de volta no arquivo Excel
         df_novo = pd.concat([df_lotofacil, pd.DataFrame([nova_linha])], ignore_index=True)
         df_novo.to_excel(NOME_ARQUIVO, index=False)
 
-        # 5. Atualiza a memória global e recarrega o engine estatístico
+        # Atualiza a memória global e recarrega o engine estatístico
         df_lotofacil = df_novo
         engine = LotofacilEngine(df_lotofacil)
 
@@ -135,7 +145,7 @@ def atualizar_base_caixa():
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Erro ao sincronizar com a Caixa: {str(e)}"
-        )
+        return {
+            "sucesso": False,
+            "mensagem": f"Não foi possível sincronizar com a Caixa no momento: {str(e)}"
+        }
