@@ -5,12 +5,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# Importa as classes do seu motor de inteligência estatística
 from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
-app = FastAPI(title="Lotofácil Engine API", version="2.0")
+app = FastAPI(title="Lotofácil Engine API", version="2.1")
 
-# Configuração global de CORS para permitir requisições da Vercel ou qualquer origem
+# Configuração global de CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,30 +20,25 @@ app.add_middleware(
 
 NOME_ARQUIVO = "Lotofacil.xlsx"
 
-# Helper para carregar/instanciar o engine a partir do Excel local
 def carregar_engine():
     if os.path.exists(NOME_ARQUIVO):
         df = pd.read_excel(NOME_ARQUIVO)
         return LotofacilEngine(df), df
     else:
-        raise FileNotFoundError(f"Arquivo '{NOME_ARQUIVO}' não foi encontrado na pasta raiz.")
+        # Se não houver planilha, cria uma estrutura básica ou levanta erro legível
+        raise RuntimeError(f"Arquivo '{NOME_ARQUIVO}' não foi encontrado na pasta raiz.")
 
-# Instancia o engine e o dataframe globalmente no arranque da API
 engine, df_lotofacil = carregar_engine()
 
 
-# --- MODELOS DE DADOS (Pydantic) ---
 class RequisicaoGerarJogos(BaseModel):
     quantidade: int = 1
     score_minimo: int = 80
     max_interseccao: int = 12
 
 
-# --- ROTAS DA API ---
-
 @app.get("/")
 def home():
-    """Rota raiz para verificação rápida de status do servidor"""
     return {
         "status": "online",
         "mensagem": "Lotofácil Engine API está em execução.",
@@ -54,68 +48,81 @@ def home():
 
 @app.get("/api/estatisticas")
 def obter_estatisticas():
-    """Retorna o relatório resumido dos 6 Juízes para a interface React"""
-    return {
-        "total_concursos": len(engine.df),
-        "frequencia": engine.juiz_de_frequencia(),
-        "ciclos": engine.juiz_de_padroes_e_ciclos(),
-        "paridade": engine.juiz_de_paridade_e_primos(),
-        "soma": engine.juiz_de_soma_e_amplitude(),
-        "sequencias": engine.juiz_de_sequencias_e_repeticoes(),
-        "moldura": engine.juiz_de_moldura_e_miolo()
-    }
+    try:
+        return {
+            "total_concursos": len(engine.df),
+            "frequencia": engine.juiz_de_frequencia(),
+            "ciclos": engine.juiz_de_padroes_e_ciclos(),
+            "paridade": engine.juiz_de_paridade_e_primos(),
+            "soma": engine.juiz_de_soma_e_amplitude(),
+            "sequencias": engine.juiz_de_sequencias_e_repeticoes(),
+            "moldura": engine.juiz_de_moldura_e_miolo()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao calcular estatísticas: {str(e)}")
 
 
 @app.post("/api/gerar-jogos")
 def gerar_jogos(req: RequisicaoGerarJogos):
-    """Gera os Bilhetes Diamante submetendo-os aos Juízes e aos Curadores em cadeia"""
-    validador = CuradorDeValidacao(engine=engine, score_minimo=req.score_minimo)
-    gerador = CuradorDeSelecaoFinal(engine=engine, validador=validador)
-    
-    resultado = gerador.gerar_bilhetes_diamante(
-        quantidade=req.quantidade, 
-        max_interseccao=req.max_interseccao
-    )
-    return resultado
+    """
+    Gera jogos protegendo a rota contra exceções não tratadas que causam erro 500 sem CORS
+    """
+    try:
+        validador = CuradorDeValidacao(engine=engine, score_minimo=req.score_minimo)
+        gerador = CuradorDeSelecaoFinal(engine=engine, validador=validador)
+        
+        resultado = gerador.gerar_bilhetes_diamante(
+            quantidade=req.quantidade, 
+            max_interseccao=req.max_interseccao
+        )
+        return resultado
+    except Exception as e:
+        # Evita a queda com Erro 500 genérico e envia mensagem clara
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Não foi possível gerar os bilhetes com os parâmetros atuais: {str(e)}"
+        )
 
 
 @app.post("/api/atualizar-base")
 def atualizar_base_caixa():
-    """
-    Busca o resultado do concurso mais recente na API oficial da Caixa.
-    Se houver novo concurso, grava no Lotofacil.xlsx e recarrega o Engine.
-    """
     global engine, df_lotofacil
     
     try:
         url_caixa = "https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil"
         
-        # Cabeçalhos HTTP para simular um navegador real e evitar bloqueios em nuvens como o Render
+        # Headers mais robustos para evitar o bloqueio 403 da Caixa em servidores na nuvem
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
             "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Host": "servicebus2.caixa.gov.br",
+            "Referer": "https://loterias.caixa.gov.br/"
         }
         
-        response = requests.get(url_caixa, headers=headers, timeout=15, verify=False)
+        session = requests.Session()
+        response = session.get(url_caixa, headers=headers, timeout=15, verify=False)
         
-        if response.status_code != 200:
+        if response.status_code == 403:
             return {
                 "sucesso": False,
-                "mensagem": f"O servidor da Caixa retornou o código de erro {response.status_code}."
+                "mensagem": "A Caixa bloqueou temporariamente a requisição direta (Erro 403). Tente novamente em alguns instantes."
+            }
+        elif response.status_code != 200:
+            return {
+                "sucesso": False,
+                "mensagem": f"O servidor da Caixa retornou o código HTTP {response.status_code}."
             }
             
         dados_caixa = response.json()
         ultimo_concurso_caixa = dados_caixa["numero"]
         dezenas_sorteadas = [int(d) for d in dados_caixa["listaDezenas"]]
         
-        # Verifica o concurso mais atual gravado na planilha local
         if "Concurso" in df_lotofacil.columns:
             ultimo_concurso_local = int(df_lotofacil["Concurso"].max())
         else:
             ultimo_concurso_local = len(df_lotofacil)
 
-        # Se já estiver atualizado, interrompe e avisa a interface
         if ultimo_concurso_caixa <= ultimo_concurso_local:
             return {
                 "sucesso": True,
@@ -124,16 +131,13 @@ def atualizar_base_caixa():
                 "novo_sorteio_adicionado": False
             }
 
-        # Monta a nova linha de dados mantendo a estrutura da planilha
         nova_linha = {"Concurso": ultimo_concurso_caixa}
         for idx, dezena in enumerate(sorted(dezenas_sorteadas), start=1):
             nova_linha[f"Bola{idx}"] = dezena
 
-        # Concatena e salva de volta no arquivo Excel
         df_novo = pd.concat([df_lotofacil, pd.DataFrame([nova_linha])], ignore_index=True)
         df_novo.to_excel(NOME_ARQUIVO, index=False)
 
-        # Atualiza a memória global e recarrega o engine estatístico
         df_lotofacil = df_novo
         engine = LotofacilEngine(df_lotofacil)
 
