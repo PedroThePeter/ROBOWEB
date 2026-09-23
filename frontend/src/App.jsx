@@ -6,7 +6,7 @@ export default function App() {
   const [estatisticas, setEstatisticas] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingGerar, setLoadingGerar] = useState(false);
-  const [loadingAtualizar, setLoadingAtualizar] = useState(false);
+  const [loadingRecarregar, setLoadingRecarregar] = useState(false);
   
   const [quantidade, setQuantidade] = useState(1);
   const [jogosGerados, setJogosGerados] = useState([]);
@@ -34,12 +34,12 @@ export default function App() {
     carregarEstatisticas();
   }, []);
 
-  const handleAtualizarBase = async () => {
-    setLoadingAtualizar(true);
+  const handleRecarregarBase = async () => {
+    setLoadingRecarregar(true);
     setMensagemSucesso("");
     setMensagemErro("");
     try {
-      const response = await fetch(`${API_BASE}/api/atualizar-base`, {
+      const response = await fetch(`${API_BASE}/api/recarregar-base`, {
         method: "POST",
         headers: { "Content-Type": "application/json" }
       });
@@ -52,9 +52,9 @@ export default function App() {
         setMensagemErro(data.mensagem);
       }
     } catch (err) {
-      setMensagemErro(`Erro ao conectar com a Caixa: ${err.message}`);
+      setMensagemErro(`Erro ao recarregar base: ${err.message}`);
     } finally {
-      setLoadingAtualizar(false);
+      setLoadingRecarregar(false);
     }
   };
 
@@ -95,7 +95,7 @@ export default function App() {
   return (
     <div style={{ maxWidth: "1000px", margin: "0 auto", padding: "20px", fontFamily: "sans-serif" }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
         <h2>💎 Lotofácil Engine - Inteligência Estatística</h2>
         <div>
           <span style={{ marginRight: "10px", fontWeight: "bold" }}>
@@ -103,11 +103,12 @@ export default function App() {
           </span>
           {estatisticas && <span>| Concursos: {estatisticas.total_concursos}</span>}
           <button 
-            onClick={handleAtualizarBase} 
-            disabled={loadingAtualizar}
-            style={{ marginLeft: "15px", padding: "8px 12px", cursor: "pointer" }}
+            onClick={handleRecarregarBase} 
+            disabled={loadingRecarregar}
+            style={{ marginLeft: "15px", padding: "8px 12px", cursor: "pointer", backgroundColor: "#334155", color: "#fff", border: "none", borderRadius: "4px" }}
+            title="Atualiza a leitura após enviar uma nova planilha Lotofacil.xlsx"
           >
-            {loadingAtualizar ? "Sincronizando..." : "🔄 Atualizar Resultados (Caixa)"}
+            {loadingRecarregar ? "Atualizando..." : "📂 Recarregar Planilha Local"}
           </button>
         </div>
       </div>
