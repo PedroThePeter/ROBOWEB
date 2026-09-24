@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
-app = FastAPI(title="Lotofácil Engine API", version="3.5")
+app = FastAPI(title="Lotofácil Engine API", version="4.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,7 +31,7 @@ engine, df_lotofacil = carregar_engine()
 
 class RequisicaoGerarJogos(BaseModel):
     quantidade: Optional[int] = 1
-    score_minimo: Optional[int] = 140
+    score_minimo: Optional[int] = 160
     max_interseccao: Optional[int] = 12
 
 
@@ -39,7 +39,7 @@ class RequisicaoGerarJogos(BaseModel):
 def home():
     return {
         "status": "online",
-        "mensagem": "Lotofácil Engine API operacional (Sistema de Score até 180).",
+        "mensagem": "Lotofácil Engine API operacional (Sistema de Score até 220).",
         "concursos_carregados": len(engine.df)
     }
 
@@ -54,7 +54,9 @@ def obter_estatisticas():
             "paridade": engine.juiz_de_paridade_e_primos(),
             "soma": engine.juiz_de_soma_e_amplitude(),
             "sequencias": engine.juiz_de_sequencias_e_repeticoes(),
-            "moldura": engine.juiz_de_moldura_e_miolo()
+            "moldura": engine.juiz_de_moldura_e_miolo(),
+            "fibonacci": engine.juiz_de_fibonacci(),
+            "multiplos_tres": engine.juiz_de_multiplos_de_tres()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao obter estatísticas: {str(e)}")
@@ -64,7 +66,7 @@ def obter_estatisticas():
 def gerar_jogos(req: RequisicaoGerarJogos):
     try:
         qtd = req.quantidade if req.quantidade is not None else 1
-        score = req.score_minimo if req.score_minimo is not None else 140
+        score = req.score_minimo if req.score_minimo is not None else 160
         interseccao = req.max_interseccao if req.max_interseccao is not None else 12
 
         stats_frequencia = engine.juiz_de_frequencia()
@@ -73,6 +75,8 @@ def gerar_jogos(req: RequisicaoGerarJogos):
         stats_soma = engine.juiz_de_soma_e_amplitude()
         stats_sequencias = engine.juiz_de_sequencias_e_repeticoes()
         stats_moldura = engine.juiz_de_moldura_e_miolo()
+        stats_fibonacci = engine.juiz_de_fibonacci()
+        stats_multiplos = engine.juiz_de_multiplos_de_tres()
         ultimo_concurso = engine.obter_ultimo_concurso()
 
         validador = CuradorDeValidacao(
@@ -82,6 +86,8 @@ def gerar_jogos(req: RequisicaoGerarJogos):
             stats_soma=stats_soma,
             stats_sequencias=stats_sequencias,
             stats_moldura=stats_moldura,
+            stats_fibonacci=stats_fibonacci,
+            stats_multiplos=stats_multiplos,
             ultimo_concurso=ultimo_concurso,
             score_minimo=score
         )

@@ -8,47 +8,35 @@ class LotofacilEngine:
         self.colunas_dezenas = self._identificar_colunas()
 
     def _identificar_colunas(self) -> List[str]:
-        """Identifica de forma blindada as 15 colunas das dezenas, ignorando a coluna de Data."""
         cols = []
         for c in self.df.columns:
             nome = str(c).lower().strip()
-            # Procura por 'bola', 'dezena' ou formato estrito como 'd1', 'd15'
             if 'bola' in nome or 'dezena' in nome or (nome.startswith('d') and nome[1:].isdigit()):
                 cols.append(c)
-        
-        # Fallback seguro: Se a planilha tiver nomes genéricos, ignora a Coluna 0 (Concurso) e Coluna 1 (Data)
         if len(cols) < 15:
             cols = self.df.columns[2:17]
-            
         return list(cols)
 
     def obter_ultimo_concurso(self) -> List[int]:
-        """Retorna as 15 dezenas sorteadas no último concurso registrado sem estourar erro de data."""
         if self.df.empty:
             return []
-        
         ultimo_row = self.df.iloc[-1][self.colunas_dezenas].values
-        
         dezenas = []
         for val in ultimo_row:
             try:
-                # Tenta converter para inteiro, ignora lixos e datas que possam ter escapado
                 num = int(val)
                 if 1 <= num <= 25:
                     dezenas.append(num)
             except (ValueError, TypeError):
                 continue
-                
         return dezenas
 
     def juiz_de_frequencia(self) -> Dict[str, Any]:
-        """Avalia a frequência das dezenas nos últimos concursos."""
         total_sorteios = len(self.df)
         contagem = {}
         for i in range(1, 26):
             soma = 0
             for col in self.colunas_dezenas:
-                # Usa pd.to_numeric para garantir conversão segura e evitar erros com strings
                 soma += (pd.to_numeric(self.df[col], errors='coerce') == i).sum()
             contagem[i] = int(soma)
 
@@ -95,15 +83,34 @@ class LotofacilEngine:
             "miolo_ideal": [4, 5, 6]
         }
 
+    # --- NOVOS JUIZES ADICIONADOS ---
+    def juiz_de_fibonacci(self) -> Dict[str, Any]:
+        """Acompanha dezenas da Sequência de Fibonacci (1, 2, 3, 5, 8, 13, 21)."""
+        return {
+            "fibonacci_ideais": [3, 4, 5],
+            "dezenas_fibonacci": [1, 2, 3, 5, 8, 13, 21]
+        }
+
+    def juiz_de_multiplos_de_tres(self) -> Dict[str, Any]:
+        """Acompanha dezenas múltiplas de 3 (3, 6, 9, 12, 15, 18, 21, 24)."""
+        return {
+            "multiplos_ideais": [4, 5, 6],
+            "dezenas_multiplos_3": [3, 6, 9, 12, 15, 18, 21, 24]
+        }
+
 
 class CuradorDeValidacao:
-    def __init__(self, stats_frequencia, stats_ciclos, stats_paridade, stats_soma, stats_sequencias, stats_moldura, ultimo_concurso: List[int], score_minimo: int = 140):
+    def __init__(self, stats_frequencia, stats_ciclos, stats_paridade, stats_soma, 
+                 stats_sequencias, stats_moldura, stats_fibonacci, stats_multiplos, 
+                 ultimo_concurso: List[int], score_minimo: int = 160):
         self.stats_frequencia = stats_frequencia
         self.stats_ciclos = stats_ciclos
         self.stats_paridade = stats_paridade
         self.stats_soma = stats_soma
         self.stats_sequencias = stats_sequencias
         self.stats_moldura = stats_moldura
+        self.stats_fibonacci = stats_fibonacci
+        self.stats_multiplos = stats_multiplos
         self.ultimo_concurso = set(ultimo_concurso)
         self.score_minimo = score_minimo
 
@@ -142,7 +149,7 @@ class CuradorDeValidacao:
         if max_seq <= limite_seq:
             score += 25
 
-        # --- 2. BÔNUS EXTRA DOS JUIZES (Até +80 Pontos Extra -> Máx 180) ---
+        # --- 2. BÔNUS EXTRA DOS JUIZES ANTERIORES (Até +80 Pontos) ---
         quentes = set(self.stats_frequencia.get("quentes", []))
         if 6 <= len(dezenas_set.intersection(quentes)) <= 8:
             score += 20
@@ -158,6 +165,15 @@ class CuradorDeValidacao:
         if self.ultimo_concurso:
             if 8 <= len(dezenas_set.intersection(self.ultimo_concurso)) <= 10:
                 score += 20
+
+        # --- 3. BÔNUS DOS NOVOS JUIZES (Até +40 Pontos -> TETO TOTAL: 220) ---
+        fib_set = set(self.stats_fibonacci.get("dezenas_fibonacci", [1, 2, 3, 5, 8, 13, 21]))
+        if len(dezenas_set.intersection(fib_set)) in self.stats_fibonacci.get("fibonacci_ideais", [3, 4, 5]):
+            score += 20
+
+        mult_set = set(self.stats_multiplos.get("dezenas_multiplos_3", [3, 6, 9, 12, 15, 18, 21, 24]))
+        if len(dezenas_set.intersection(mult_set)) in self.stats_multiplos.get("multiplos_ideais", [4, 5, 6]):
+            score += 20
 
         return score
 
