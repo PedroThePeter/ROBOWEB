@@ -5,12 +5,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# Importação dos módulos do motor estatístico
 from engine import LotofacilEngine, CuradorDeValidacao, CuradorDeSelecaoFinal
 
-app = FastAPI(title="Lotofácil Engine API", version="3.0")
+app = FastAPI(title="Lotofácil Engine API", version="3.5")
 
-# Configuração global de CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -28,14 +26,12 @@ def carregar_engine():
     else:
         raise RuntimeError(f"Arquivo '{NOME_ARQUIVO}' não foi encontrado na pasta raiz do projeto.")
 
-# Instanciação global na inicialização
 engine, df_lotofacil = carregar_engine()
 
 
-# Modelo de dados com tipos opcionais e score mínimo padrão elevado para 90
 class RequisicaoGerarJogos(BaseModel):
     quantidade: Optional[int] = 1
-    score_minimo: Optional[int] = 90
+    score_minimo: Optional[int] = 140
     max_interseccao: Optional[int] = 12
 
 
@@ -43,7 +39,7 @@ class RequisicaoGerarJogos(BaseModel):
 def home():
     return {
         "status": "online",
-        "mensagem": "Lotofácil Engine API v3.0 operacional (Alta Rigorosidade Estatística).",
+        "mensagem": "Lotofácil Engine API operacional (Sistema de Score até 180).",
         "concursos_carregados": len(engine.df)
     }
 
@@ -68,30 +64,29 @@ def obter_estatisticas():
 def gerar_jogos(req: RequisicaoGerarJogos):
     try:
         qtd = req.quantidade if req.quantidade is not None else 1
-        score = req.score_minimo if req.score_minimo is not None else 90
+        score = req.score_minimo if req.score_minimo is not None else 140
         interseccao = req.max_interseccao if req.max_interseccao is not None else 12
 
-        # Extração de todas as estatísticas para os Curadores
         stats_frequencia = engine.juiz_de_frequencia()
         stats_ciclos = engine.juiz_de_padroes_e_ciclos()
         stats_paridade = engine.juiz_de_paridade_e_primos()
         stats_soma = engine.juiz_de_soma_e_amplitude()
         stats_sequencias = engine.juiz_de_sequencias_e_repeticoes()
+        stats_moldura = engine.juiz_de_moldura_e_miolo()
+        ultimo_concurso = engine.obter_ultimo_concurso()
 
         validador = CuradorDeValidacao(
+            stats_frequencia=stats_frequencia,
             stats_ciclos=stats_ciclos,
             stats_paridade=stats_paridade,
             stats_soma=stats_soma,
             stats_sequencias=stats_sequencias,
+            stats_moldura=stats_moldura,
+            ultimo_concurso=ultimo_concurso,
             score_minimo=score
         )
         
-        gerador = CuradorDeSelecaoFinal(
-            validador=validador,
-            stats_frequencia=stats_frequencia,
-            stats_ciclos=stats_ciclos,
-            stats_sequencias=stats_sequencias
-        )
+        gerador = CuradorDeSelecaoFinal(validador=validador)
         
         resultado = gerador.gerar_bilhetes_diamante(
             quantidade=qtd, 

@@ -9,7 +9,7 @@ export default function App() {
   const [loadingRecarregar, setLoadingRecarregar] = useState(false);
   
   const [quantidade, setQuantidade] = useState(1);
-  const [scoreMinimo, setScoreMinimo] = useState(90);
+  const [scoreMinimo, setScoreMinimo] = useState(140);
   const [jogosGerados, setJogosGerados] = useState([]);
   const [mensagemErro, setMensagemErro] = useState("");
   const [mensagemSucesso, setMensagemSucesso] = useState("");
@@ -66,13 +66,15 @@ export default function App() {
     try {
       const payload = {
         quantidade: parseInt(quantidade, 10) || 1,
-        score_minimo: parseInt(scoreMinimo, 10) || 90,
+        score_minimo: parseInt(scoreMinimo, 10) || 140,
         max_interseccao: 12
       };
 
       const response = await fetch(`${API_BASE}/api/gerar-jogos`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify(payload)
       });
 
@@ -83,7 +85,7 @@ export default function App() {
       }
 
       setJogosGerados(Array.isArray(data) ? data : [data]);
-      setMensagemSucesso("Bilhete Diamante de Alta Performance gerado!");
+      setMensagemSucesso("Bilhete Diamante gerado com sucesso!");
     } catch (err) {
       setMensagemErro(err.message);
     } finally {
@@ -95,7 +97,7 @@ export default function App() {
     <div style={{ maxWidth: "1000px", margin: "0 auto", padding: "20px", fontFamily: "sans-serif" }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
-        <h2>💎 Lotofácil Engine v3.0 - Alta Rigorosidade</h2>
+        <h2>💎 Lotofácil Engine - Inteligência Estatística</h2>
         <div>
           <span style={{ marginRight: "10px", fontWeight: "bold" }}>
             API: {loadingStats ? "Carregando..." : estatisticas ? "🟢 Online" : "🔴 Offline"}
@@ -105,6 +107,7 @@ export default function App() {
             onClick={handleRecarregarBase} 
             disabled={loadingRecarregar}
             style={{ marginLeft: "15px", padding: "8px 12px", cursor: "pointer", backgroundColor: "#334155", color: "#fff", border: "none", borderRadius: "4px" }}
+            title="Atualiza a leitura após enviar uma nova planilha Lotofacil.xlsx"
           >
             {loadingRecarregar ? "Atualizando..." : "📂 Recarregar Planilha Local"}
           </button>
@@ -125,11 +128,11 @@ export default function App() {
 
       {/* Cards Estatísticos */}
       {loadingStats ? (
-        <p>Carregando análises dos 6 Juízes...</p>
+        <p>Carregando análises dos Juízes...</p>
       ) : estatisticas ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "15px", marginBottom: "30px" }}>
           <div style={{ border: "1px solid #ccc", padding: "15px", borderRadius: "8px" }}>
-            <h4>1. Frequência (Top 10)</h4>
+            <h4>1. Frequência (Top 20)</h4>
             <p><strong>Quentes:</strong> {Array.isArray(estatisticas.frequencia?.quentes) ? estatisticas.frequencia.quentes.join(", ") : "N/A"}</p>
           </div>
           <div style={{ border: "1px solid #ccc", padding: "15px", borderRadius: "8px" }}>
@@ -145,37 +148,45 @@ export default function App() {
 
       {/* Gerador de Jogos */}
       <div style={{ border: "1px solid #1e40af", padding: "20px", borderRadius: "8px", backgroundColor: "#f0f9ff" }}>
-        <h3>🚀 Gerador Inteligente (Juízes + Curadores v3.0)</h3>
-        <div style={{ display: "flex", gap: "20px", marginBottom: "15px", flexWrap: "wrap" }}>
+        <h3>🚀 Gerador Inteligente (Juízes + Curadores v3.5)</h3>
+        <p style={{ color: "#475569", fontSize: "14px", marginTop: "-5px" }}>
+          Sistema de pontuação acumulativa: <strong>Teto de até 180 Pontos</strong> (100 Base + 80 Bônus Especial)
+        </p>
+        
+        <div style={{ display: "flex", gap: "20px", alignItems: "center", marginBottom: "15px", marginTop: "15px", flexWrap: "wrap" }}>
           <div>
-            <label style={{ marginRight: "10px" }}>Quantidade:</label>
+            <label style={{ marginRight: "10px", fontWeight: "bold" }}>Quantidade:</label>
             <input 
               type="number" 
               min="1" 
               max="10" 
               value={quantidade} 
               onChange={(e) => setQuantidade(e.target.value)}
-              style={{ width: "60px", padding: "5px" }}
+              style={{ width: "60px", padding: "6px", borderRadius: "4px", border: "1px solid #ccc" }}
             />
           </div>
+
           <div>
-            <label style={{ marginRight: "10px" }}>Score Mínimo (Rigor):</label>
+            <label style={{ marginRight: "10px", fontWeight: "bold" }}>Score Mínimo (Rigor):</label>
             <input 
               type="number" 
-              min="80" 
-              max="100" 
+              min="50" 
+              max="180" 
+              step="10"
               value={scoreMinimo} 
               onChange={(e) => setScoreMinimo(e.target.value)}
-              style={{ width: "70px", padding: "5px" }}
+              style={{ width: "80px", padding: "6px", borderRadius: "4px", border: "1px solid #ccc", fontWeight: "bold", color: "#1e40af" }}
             />
+            <span style={{ fontSize: "12px", color: "#64748b", marginLeft: "6px" }}>(Máx: 180)</span>
           </div>
         </div>
+
         <button 
           onClick={handleGerarJogos} 
           disabled={loadingGerar}
-          style={{ padding: "10px 20px", backgroundColor: "#1e40af", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer" }}
+          style={{ padding: "10px 20px", backgroundColor: "#1e40af", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
         >
-          {loadingGerar ? "Processando Curadoria Rigorosa..." : "💎 Gerar Bilhete Diamante"}
+          {loadingGerar ? "Executando Análise de Alta Performance..." : "💎 Gerar Bilhete Diamante"}
         </button>
       </div>
 
@@ -192,12 +203,12 @@ export default function App() {
 
             return (
               <div key={index} style={{ border: "1px solid #22c55e", padding: "15px", borderRadius: "8px", marginBottom: "10px", backgroundColor: "#f0fdf4" }}>
-                <p style={{ fontSize: "16px", fontWeight: "bold", color: "#166534" }}>
+                <p style={{ fontSize: "16px", fontWeight: "bold", color: "#166534", margin: "0 0 8px 0" }}>
                   Bilhete {index + 1}: {dezenasLista.length > 0 ? dezenasLista.join(" - ") : JSON.stringify(item)}
                 </p>
                 {item.tentativas_gastas !== undefined && (
-                  <p style={{ margin: "5px 0 0 0", color: "#374151" }}>
-                    <small>⚡ Tentativas gastas: <strong>{item.tentativas_gastas}</strong> | Taxa de Eficiência: <strong>{item.eficiencia || "N/A"}</strong></small>
+                  <p style={{ margin: "0", color: "#374151" }}>
+                    <small>⚡ Tentativas gastas: <strong>{item.tentativas_gastas}</strong> | Taxa de Eficiência: <strong>{item.eficiencia || "N/A"}</strong> | Score Exigido: <strong>{item.score_aplicado || scoreMinimo}/180</strong></small>
                   </p>
                 )}
               </div>

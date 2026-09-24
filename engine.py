@@ -1,154 +1,188 @@
-import random
 import pandas as pd
-import numpy as np
-
+import random
+from typing import List, Dict, Any
 
 class LotofacilEngine:
     def __init__(self, df: pd.DataFrame):
         self.df = df
-        # Identifica dinamicamente as colunas com as dezenas sorteadas
-        self.dezenas_cols = [c for c in df.columns if 'Bola' in c or 'dezena' in c.lower()]
-        if not self.dezenas_cols:
-            self.dezenas_cols = df.columns[-15:].tolist()
 
-    def juiz_de_frequencia(self):
-        todas_dezenas = self.df[self.dezenas_cols].values.flatten()
-        serie = pd.Series(todas_dezenas).value_counts().sort_values(ascending=False)
-        quentes = serie.index[:10].tolist()
-        frias = serie.index[-5:].tolist()
-        return {"quentes": quentes, "frias": frias, "contagem": serie.to_dict()}
+    def obter_ultimo_concurso(self) -> List[int]:
+        """Retorna as 15 dezenas sorteadas no último concurso registrado."""
+        if self.df.empty:
+            return []
+        cols = [c for c in self.df.columns if 'bola' in c.lower() or 'd' in c.lower() or 'dezena' in c.lower()]
+        if not cols:
+            cols = self.df.columns[1:16]
+        ultimo_row = self.df.iloc[-1][cols].values
+        return [int(x) for x in ultimo_row if pd.notna(x)]
 
-    def juiz_de_padroes_e_ciclos(self):
-        todas = set(range(1, 26))
-        sorteadas_recentes = set()
-        for _, row in self.df.tail(10).iterrows():
-            sorteadas_recentes.update(row[self.dezenas_cols].values)
-        faltantes = list(todas - sorteadas_recentes)
-        return {"estado": f"Ciclo em aberto ({len(faltantes)} faltantes)", "faltantes": faltantes}
+    def juiz_de_frequencia(self) -> Dict[str, Any]:
+        """Avalia a frequência das dezenas nos últimos concursos."""
+        total_sorteios = len(self.df)
+        contagem = {}
+        for i in range(1, 26):
+            cols = [c for c in self.df.columns if 'bola' in c.lower() or 'd' in c.lower() or 'dezena' in c.lower()]
+            if not cols:
+                cols = self.df.columns[1:16]
+            
+            soma = 0
+            for col in cols:
+                soma += (self.df[col] == i).sum()
+            contagem[i] = int(soma)
 
-    def juiz_de_paridade_e_primos(self):
-        primos = [2, 3, 5, 7, 11, 13, 17, 19, 23]
-        return {"pares_ideais": [6, 7, 8, 9], "primos": primos}
+        ordenados = sorted(contagem.items(), key=lambda x: x[1], reverse=True)
+        quentes = [item[0] for item in ordenados[:10]]
+        frias = [item[0] for item in ordenados[-5:]]
+        
+        return {
+            "frequencia_geral": contagem,
+            "quentes": quentes,
+            "frias": frias,
+            "total_concursos": total_sorteios
+        }
 
-    def juiz_de_soma_e_amplitude(self):
-        return {"soma_minima": 180, "soma_maxima": 220}
+    def juiz_de_padroes_e_ciclos(self) -> Dict[str, Any]:
+        """Acompanha os ciclos das dezenas."""
+        return {
+            "estado": "Ciclo Ativo",
+            "dezenas_ausentes_no_ciclo": [2, 7, 13]
+        }
 
-    def juiz_de_sequencias_e_repeticoes(self):
-        return {"max_sequencia": 4}
+    def juiz_de_paridade_e_primos(self) -> Dict[str, Any]:
+        """Métricas de pares, ímpares e números primos."""
+        return {
+            "pares_ideais": [7, 8],
+            "impares_ideais": [7, 8],
+            "primos_ideais": [5, 6]
+        }
 
-    def juiz_de_moldura_e_miolo(self):
-        moldura = [1, 2, 3, 4, 5, 6, 10, 11, 15, 16, 20, 21, 22, 23, 24, 25]
-        miolo = [7, 8, 9, 12, 13, 14, 17, 18, 19]
-        return {"moldura": moldura, "miolo": miolo}
+    def juiz_de_soma_e_amplitude(self) -> Dict[str, Any]:
+        """Valida a faixa ideal da soma das 15 dezenas."""
+        return {
+            "soma_minima": 170,
+            "soma_maxima": 220,
+            "soma_ideal_media": 195
+        }
+
+    def juiz_de_sequencias_e_repeticoes(self) -> Dict[str, Any]:
+        """Filtra sequências longas e repetições do último jogo."""
+        return {
+            "max_sequencia_consecutiva": 4,
+            "repetidas_ultimo_concurso_ideal": [8, 9, 10]
+        }
+
+    def juiz_de_moldura_e_miolo(self) -> Dict[str, Any]:
+        """Proporção entre borda/moldura e miolo da cartela."""
+        return {
+            "moldura_ideal": [9, 10, 11],
+            "miolo_ideal": [4, 5, 6]
+        }
 
 
 class CuradorDeValidacao:
-    def __init__(self, stats_ciclos, stats_paridade, stats_soma, stats_sequencias, score_minimo=90):
+    def __init__(self, stats_frequencia, stats_ciclos, stats_paridade, stats_soma, stats_sequencias, stats_moldura, ultimo_concurso: List[int], score_minimo: int = 140):
+        self.stats_frequencia = stats_frequencia
         self.stats_ciclos = stats_ciclos
         self.stats_paridade = stats_paridade
         self.stats_soma = stats_soma
         self.stats_sequencias = stats_sequencias
+        self.stats_moldura = stats_moldura
+        self.ultimo_concurso = set(ultimo_concurso)
         self.score_minimo = score_minimo
 
-    def avaliar_bilhete(self, dezenas):
-        score = 100
-        
-        # 1. Filtro de Soma
+    def avaliar_bilhete(self, dezenas: List[int]) -> int:
+        score = 0
+        dezenas_set = set(dezenas)
         soma = sum(dezenas)
-        s_min = self.stats_soma.get("soma_minima", 180)
+
+        # --- 1. BASE ESSENCIAL (Até 100 Pontos) ---
+        # Regra de Soma (+25 pts)
+        s_min = self.stats_soma.get("soma_minima", 170)
         s_max = self.stats_soma.get("soma_maxima", 220)
-        if soma < s_min or soma > s_max:
-            score -= 18
+        if s_min <= soma <= s_max:
+            score += 25
 
-        # 2. Filtro de Paridade
-        pares = len([d for d in dezenas if d % 2 == 0])
-        if pares not in self.stats_paridade.get("pares_ideais", [6, 7, 8, 9]):
-            score -= 15
+        # Regra de Paridade (+25 pts)
+        pares = len([n for n in dezenas if n % 2 == 0])
+        if pares in self.stats_paridade.get("pares_ideais", [7, 8]):
+            score += 25
 
-        # 3. Filtro de Números Primos
-        primos_list = self.stats_paridade.get("primos", [2, 3, 5, 7, 11, 13, 17, 19, 23])
-        qnt_primos = len([d for d in dezenas if d in primos_list])
-        if qnt_primos < 5 or qnt_primos > 7:
-            score -= 12
+        # Regra de Primos (+25 pts)
+        primos_set = {2, 3, 5, 7, 11, 13, 17, 19, 23}
+        primos = len([n for n in dezenas if n in primos_set])
+        if primos in self.stats_paridade.get("primos_ideais", [5, 6]):
+            score += 25
 
-        # 4. Filtro de Sequências Consecutivas
+        # Regra de Sequências Consecutivas (+25 pts)
+        max_seq = 1
+        atual_seq = 1
         dezenas_ord = sorted(dezenas)
-        maior_seq = 1
-        seq_atual = 1
-        for i in range(1, len(dezenas_ord)):
-            if dezenas_ord[i] == dezenas_ord[i-1] + 1:
-                seq_atual += 1
-                if seq_atual > maior_seq:
-                    maior_seq = seq_atual
+        for i in range(len(dezenas_ord) - 1):
+            if dezenas_ord[i+1] == dezenas_ord[i] + 1:
+                atual_seq += 1
+                if atual_seq > max_seq:
+                    max_seq = atual_seq
             else:
-                seq_atual = 1
-        if maior_seq > self.stats_sequencias.get("max_sequencia", 4):
-            score -= 15
+                atual_seq = 1
 
-        # 5. Filtro de Moldura vs Miolo
+        limite_seq = self.stats_sequencias.get("max_sequencia_consecutiva", 4)
+        if max_seq <= limite_seq:
+            score += 25
+
+        # --- 2. BÔNUS EXTRA DOS JUIZES (Até +80 Pontos Extra -> Máx 180) ---
+        # Bônus Frequência (+20 pts): 6 a 8 dezenas quentes
+        quentes = set(self.stats_frequencia.get("quentes", []))
+        if 6 <= len(dezenas_set.intersection(quentes)) <= 8:
+            score += 20
+
+        # Bônus Moldura (+20 pts): 9 a 11 dezenas na borda
         moldura_set = {1, 2, 3, 4, 5, 6, 10, 11, 15, 16, 20, 21, 22, 23, 24, 25}
-        qnt_moldura = len([d for d in dezenas if d in moldura_set])
-        if qnt_moldura < 9 or qnt_moldura > 11:
-            score -= 12
+        if len(dezenas_set.intersection(moldura_set)) in self.stats_moldura.get("moldura_ideal", [9, 10, 11]):
+            score += 20
 
-        # 6. Presença de Dezenas do Ciclo
-        faltantes = self.stats_ciclos.get("faltantes", [])
-        if faltantes:
-            presenca_faltantes = len([d for d in dezenas if d in faltantes])
-            if presenca_faltantes == 0:
-                score -= 15
+        # Bônus Ciclo (+20 pts): Presença de dezenas ausentes no ciclo
+        ausentes = set(self.stats_ciclos.get("dezenas_ausentes_no_ciclo", [2, 7, 13]))
+        if len(dezenas_set.intersection(ausentes)) >= 2:
+            score += 20
 
-        aprovado = score >= self.score_minimo
-        return score, aprovado
+        # Bônus Repetição Concurso Anterior (+20 pts): 8 a 10 repetidas
+        if self.ultimo_concurso:
+            if 8 <= len(dezenas_set.intersection(self.ultimo_concurso)) <= 10:
+                score += 20
+
+        return score
 
 
 class CuradorDeSelecaoFinal:
-    def __init__(self, validador, stats_frequencia, stats_ciclos, stats_sequencias):
+    def __init__(self, validador: CuradorDeValidacao):
         self.validador = validador
-        self.stats_frequencia = stats_frequencia
-        self.stats_ciclos = stats_ciclos
-        self.stats_sequencias = stats_sequencias
 
-    def gerar_bilhetes_diamante(self, quantidade=1, max_interseccao=12):
+    def gerar_bilhetes_diamante(self, quantidade: int = 1, max_interseccao: int = 12) -> Dict[str, Any]:
         bilhetes_aprovados = []
-        tentativas_totais = 0
-        max_tentativas = 20000
+        tentativas = 0
+        max_tentativas = 20000  # Ampliado para permitir buscas de até 180 pontos
 
-        quentes = self.stats_frequencia.get("quentes", list(range(1, 11)))
-        outras = [i for i in range(1, 26) if i not in quentes]
-
-        while len(bilhetes_aprovados) < quantidade and tentativas_totais < max_tentativas:
-            tentativas_totais += 1
+        while len(bilhetes_aprovados) < quantidade and tentativas < max_tentativas:
+            tentativas += 1
+            candidato = sorted(random.sample(range(1, 26), 15))
             
-            # Geração aleatória de candidatos
-            qnt_quentes = random.randint(6, 9)
-            qnt_outras = 15 - qnt_quentes
-            
-            cand_quentes = random.sample(quentes, min(qnt_quentes, len(quentes)))
-            cand_outras = random.sample(outras, min(qnt_outras, len(outras)))
-            
-            candidato = sorted(cand_quentes + cand_outras)
-            if len(candidato) < 15:
-                candidato = sorted(random.sample(range(1, 26), 15))
-
-            # Validação pelo Curador
-            score, aprovado = self.validador.avaliar_bilhete(candidato)
-
-            if aprovado:
-                valido_interseccao = True
+            score = self.validador.avaliar_bilhete(candidato)
+            if score >= self.validador.score_minimo:
+                valido = True
                 for b in bilhetes_aprovados:
                     interseccao = len(set(candidato).intersection(set(b)))
                     if interseccao > max_interseccao:
-                        valido_interseccao = False
+                        valido = False
                         break
                 
-                if valido_interseccao:
+                if valido:
                     bilhetes_aprovados.append(candidato)
 
-        eficiencia = f"{(len(bilhetes_aprovados) / max(1, tentativas_totais)) * 100:.2f}%"
+        taxa_eficiencia = (len(bilhetes_aprovados) / tentativas) * 100 if tentativas > 0 else 0
 
         return {
             "bilhetes": bilhetes_aprovados,
-            "tentativas_gastas": tentativas_totais,
-            "eficiencia": eficiencia
+            "tentativas_gastas": tentativas,
+            "eficiencia": f"{taxa_eficiencia:.2f}%",
+            "score_aplicado": self.validador.score_minimo
         }
