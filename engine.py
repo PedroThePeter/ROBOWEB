@@ -2,10 +2,20 @@ import pandas as pd
 import random
 from typing import List, Dict, Any
 
-class LotofacilEngine:
+class LotofacilGeneticEngine:
     def __init__(self, df: pd.DataFrame):
         self.df = df
         self.colunas_dezenas = self._identificar_colunas()
+        self.pesos = {
+            "atraso": 30,
+            "co_ocorrencia": 30,
+            "paridade": 15,
+            "primos": 15,
+            "soma": 15,
+            "moldura": 15,
+            "repetidas_anterior": 30,
+            "sequencia": 15
+        }
 
     def _identificar_colunas(self) -> List[str]:
         cols = []
@@ -25,46 +35,28 @@ class LotofacilEngine:
         for val in ultimo_row:
             try:
                 num = int(val)
-                if 1 <= num <= 25:
-                    dezenas.append(num)
-            except (ValueError, TypeError):
-                continue
+                if 1 <= num <= 25: dezenas.append(num)
+            except: pass
         return dezenas
 
-    def juiz_de_atrasos_reais(self) -> Dict[str, Any]:
-        """Calcula a ausência consecutiva (atraso) de cada dezena baseado nos últimos concursos."""
+    def _analisar_horizonte(self, sub_df: pd.DataFrame) -> Dict[str, Any]:
         atrasos = {i: 0 for i in range(1, 26)}
-        
         for i in range(1, 26):
             count = 0
-            # Percorre do último concurso de trás pra frente
-            for idx in range(len(self.df)-1, -1, -1):
-                row = self.df.iloc[idx][self.colunas_dezenas].values
-                dezenas_sorteadas = []
+            for idx in range(len(sub_df)-1, -1, -1):
+                row = sub_df.iloc[idx][self.colunas_dezenas].values
+                sorteadas = []
                 for val in row:
-                    try: dezenas_sorteadas.append(int(val))
+                    try: sorteadas.append(int(val))
                     except: pass
-                
-                if i in dezenas_sorteadas:
-                    break
+                if i in sorteadas: break
                 count += 1
             atrasos[i] = count
-            
-        # Dezenas que estão sem sair há 3 ou mais concursos (Pressão de Retorno)
-        dezenas_criticas = [k for k, v in atrasos.items() if v >= 3]
         
-        return {
-            "atrasos": atrasos,
-            "dezenas_criticas": dezenas_criticas
-        }
+        criticas = [k for k, v in atrasos.items() if v >= 3]
 
-    def juiz_de_co_ocorrencia(self) -> Dict[str, Any]:
-        """Mapeia quais dezenas andam de mãos dadas (pares fortes) nos últimos 500 concursos."""
         pares = {}
-        limite = min(500, len(self.df))
-        df_recent = self.df.tail(limite)
-        
-        for _, row in df_recent.iterrows():
+        for _, row in sub_df.iterrows():
             dezenas = []
             for val in row[self.colunas_dezenas].values:
                 try:
@@ -72,71 +64,41 @@ class LotofacilEngine:
                     if 1 <= n <= 25: dezenas.append(n)
                 except: pass
             dezenas = sorted(dezenas)
-            
             for i in range(len(dezenas)):
                 for j in range(i+1, len(dezenas)):
                     p = (dezenas[i], dezenas[j])
                     pares[p] = pares.get(p, 0) + 1
-                    
-        # Extrai os 10 pares que mais saem juntos historicamente
-        top_pares = sorted(pares.items(), key=lambda x: x[1], reverse=True)[:10]
+        top_pares = [p[0] for p in sorted(pares.items(), key=lambda x: x[1], reverse=True)[:10]]
+
+        return {"criticas": criticas, "top_pares": top_pares}
+
+    def comite_de_horizontes(self) -> Dict[str, Any]:
+        """Ensemble combinando curto prazo (50 concursos) e longo prazo (total)."""
+        df_curto = self.df.tail(min(50, len(self.df)))
+        analise_curto = self._analisar_horizonte(df_curto)
+        analise_longo = self._analisar_horizonte(self.df)
+
+        criticas_consenso = list(set(analise_curto["criticas"] + analise_longo["criticas"]))
+        pares_consenso = list(set(analise_curto["top_pares"][:5] + analise_longo["top_pares"][:5]))
+
         return {
-            "top_pares": [p[0] for p in top_pares]
+            "dezenas_criticas": criticas_consenso,
+            "top_pares": pares_consenso
         }
 
-    def juiz_de_frequencia(self) -> Dict[str, Any]:
-        contagem = {}
-        for i in range(1, 26):
-            soma = 0
-            for col in self.colunas_dezenas:
-                soma += (pd.to_numeric(self.df[col], errors='coerce') == i).sum()
-            contagem[i] = int(soma)
-        ordenados = sorted(contagem.items(), key=lambda x: x[1], reverse=True)
-        return {
-            "quentes": [item[0] for item in ordenados[:10]],
-            "frias": [item[0] for item in ordenados[-5:]]
-        }
-
-    def juiz_de_paridade_e_primos(self) -> Dict[str, Any]:
-        return {"pares_ideais": [7, 8], "primos_ideais": [5, 6]}
-
-    def juiz_de_soma_e_amplitude(self) -> Dict[str, Any]:
-        return {"soma_minima": 170, "soma_maxima": 220}
-
-    def juiz_de_sequencias_e_moldura(self) -> Dict[str, Any]:
-        return {"max_sequencia_consecutiva": 4, "moldura_ideal": [9, 10, 11]}
-
-
-class CuradorDeValidacao:
-    def __init__(self, stats_atrasos, stats_co_ocorrencia, stats_frequencia, 
-                 stats_paridade, stats_soma, stats_seq_moldura, ultimo_concurso: List[int]):
-        self.stats_atrasos = stats_atrasos
-        self.stats_co_ocorrencia = stats_co_ocorrencia
-        self.stats_frequencia = stats_frequencia
-        self.stats_paridade = stats_paridade
-        self.stats_soma = stats_soma
-        self.stats_seq_moldura = stats_seq_moldura
-        self.ultimo_concurso = set(ultimo_concurso)
-        # Score fixado arquiteturalmente conforme decisão de projeto
-        self.score_minimo = 150 
-
-    def avaliar_bilhete(self, dezenas: List[int]) -> int:
+    def calcular_fitness(self, dezenas: List[int], stats: Dict[str, Any], ultimo_concurso: List[int]) -> int:
         score = 0
         dezenas_set = set(dezenas)
         soma = sum(dezenas)
 
-        # --- 1. SANEAMENTO BASE (Até 60 Pontos) ---
-        if self.stats_soma["soma_minima"] <= soma <= self.stats_soma["soma_maxima"]:
-            score += 15
-            
+        if 170 <= soma <= 220: score += self.pesos["soma"]
+        
         pares = len([n for n in dezenas if n % 2 == 0])
-        if pares in self.stats_paridade["pares_ideais"]:
-            score += 15
+        if pares in [7, 8]: score += self.pesos["paridade"]
             
         primos = len([n for n in dezenas if n in {2, 3, 5, 7, 11, 13, 17, 19, 23}])
-        if primos in self.stats_paridade["primos_ideais"]:
-            score += 15
-            
+        if primos in [5, 6]: score += self.pesos["primos"]
+
         max_seq, atual_seq = 1, 1
         dezenas_ord = sorted(dezenas)
         for i in range(len(dezenas_ord) - 1):
@@ -145,71 +107,91 @@ class CuradorDeValidacao:
                 max_seq = max(max_seq, atual_seq)
             else:
                 atual_seq = 1
-        if max_seq <= self.stats_seq_moldura["max_sequencia_consecutiva"]:
-            score += 15
+        if max_seq <= 4: score += self.pesos["sequencia"]
 
-        # --- 2. EQUILÍBRIO (Até 30 Pontos) ---
         moldura = len(dezenas_set.intersection({1, 2, 3, 4, 5, 6, 10, 11, 15, 16, 20, 21, 22, 23, 24, 25}))
-        if moldura in self.stats_seq_moldura["moldura_ideal"]:
-            score += 15
-            
-        quentes = set(self.stats_frequencia.get("quentes", []))
-        if 5 <= len(dezenas_set.intersection(quentes)) <= 8:
-            score += 15
+        if moldura in [9, 10, 11]: score += self.pesos["moldura"]
 
-        # --- 3. DINÂMICA PREDITIVA DE ALTA PERFORMANCE (Até 90 Pontos) ---
-        # A) Atrasos Reais: Bilhete deve resgatar pelo menos 1 dezena em atraso crítico (se houver)
-        criticas = set(self.stats_atrasos.get("dezenas_criticas", []))
+        criticas = set(stats.get("dezenas_criticas", []))
         if not criticas or len(dezenas_set.intersection(criticas)) >= 1:
-            score += 30
+            score += self.pesos["atraso"]
 
-        # B) Co-ocorrência: Bilhete deve conter pelo menos 2 duplas fortes
-        top_pares = self.stats_co_ocorrencia.get("top_pares", [])
+        top_pares = stats.get("top_pares", [])
         pares_presentes = sum(1 for p1, p2 in top_pares if p1 in dezenas_set and p2 in dezenas_set)
         if pares_presentes >= 2:
-            score += 30
+            score += self.pesos["co_ocorrencia"]
 
-        # C) Repulsão / Anti-Padrão: Historicamente, 8 a 10 dezenas se repetem. Cortamos os extremos.
-        if self.ultimo_concurso:
-            repetidas = len(dezenas_set.intersection(self.ultimo_concurso))
+        if ultimo_concurso:
+            repetidas = len(dezenas_set.intersection(set(ultimo_concurso)))
             if 8 <= repetidas <= 10:
-                score += 30
+                score += self.pesos["repetidas_anterior"]
         else:
-            score += 30
+            score += self.pesos["repetidas_anterior"]
 
         return score
 
+    def _cruzar_bilhetes(self, pai1: List[int], pai2: List[int]) -> List[int]:
+        filho = list(set(random.sample(pai1, 8) + random.sample(pai2, 7)))
+        while len(filho) < 15:
+            candidato = random.randint(1, 25)
+            if candidato not in filho:
+                filho.append(candidato)
+        return sorted(filho[:15])
 
-class CuradorDeSelecaoFinal:
-    def __init__(self, validador: CuradorDeValidacao):
-        self.validador = validador
+    def _mutar_bilhete(self, bilhete: List[int], taxa_mutacao: float = 0.18) -> List[int]:
+        mutado = list(bilhete)
+        if random.random() < taxa_mutacao:
+            idx_remover = random.randint(0, 14)
+            novo_num = random.randint(1, 25)
+            while novo_num in mutado:
+                novo_num = random.randint(1, 25)
+            mutado[idx_remover] = novo_num
+        return sorted(mutado)
 
-    def gerar_bilhetes_diamante(self, quantidade: int = 1, max_interseccao: int = 12) -> Dict[str, Any]:
-        bilhetes_aprovados = []
-        tentativas = 0
-        max_tentativas = 30000 
+    def executar_geracao_genetica(self, quantidade_desejada: int = 1, score_minimo: int = 150) -> Dict[str, Any]:
+        stats = self.comite_de_horizontes()
+        ultimo = self.obter_ultimo_concurso()
+        
+        populacao_tamanho = 300
+        populacao = [sorted(random.sample(range(1, 26), 15)) for _ in range(populacao_tamanho)]
+        
+        geracao_atual = 0
+        max_geracoes = 50
+        bilhetes_diamante = []
+        geracoes_gastas = 0
 
-        while len(bilhetes_aprovados) < quantidade and tentativas < max_tentativas:
-            tentativas += 1
-            candidato = sorted(random.sample(range(1, 26), 15))
+        while len(bilhetes_diamante) < quantidade_desejada and geracao_atual < max_geracoes:
+            geracao_atual += 1
+            geracoes_gastas = geracao_atual
+
+            avaliados = [(b, self.calcular_fitness(b, stats, ultimo)) for b in populacao]
+            avaliados.sort(key=lambda x: x[1], reverse=True)
+
+            aprovados_geracao = [b for b, score in avaliados if score >= score_minimo]
             
-            score = self.validador.avaliar_bilhete(candidato)
-            # Exige RIGOR FIXO implementado no CuradorDeValidacao
-            if score >= self.validador.score_minimo:
-                valido = True
-                for b in bilhetes_aprovados:
-                    if len(set(candidato).intersection(set(b))) > max_interseccao:
-                        valido = False
+            for b in aprovados_geracao:
+                if b not in bilhetes_diamante:
+                    bilhetes_diamante.append(b)
+                    if len(bilhetes_diamante) >= quantidade_desejada:
                         break
-                if valido:
-                    bilhetes_aprovados.append(candidato)
 
-        taxa = (len(bilhetes_aprovados) / tentativas) * 100 if tentativas > 0 else 0
+            if len(bilhetes_diamante) >= quantidade_desejada:
+                break
+
+            melhores_pais = [b for b, score in avaliados[:int(populacao_tamanho * 0.3)]]
+            
+            nova_populacao = list(melhores_pais)
+            while len(nova_populacao) < populacao_tamanho:
+                p1, p2 = random.choices(melhores_pais, k=2)
+                filho = self._cruzar_bilhetes(p1, p2)
+                filho = self._mutar_bilhete(filho, taxa_mutacao=0.18)
+                nova_populacao.append(filho)
+            
+            populacao = nova_populacao
 
         return {
-            "bilhetes": bilhetes_aprovados,
-            "tentativas_gastas": tentativas,
-            "eficiencia": f"{taxa:.3f}%",
-            "score_aplicado": self.validador.score_minimo,
-            "score_maximo_arquitetura": 180
+            "bilhetes": bilhetes_diamante[:quantidade_desejada],
+            "geracoes_gastas": geracoes_gastas,
+            "score_aplicado": score_minimo,
+            "estrategia": "Comitê Genético com Mutação Estocástica (v6.0)"
         }

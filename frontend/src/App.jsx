@@ -9,7 +9,7 @@ export default function App() {
   const [loadingRecarregar, setLoadingRecarregar] = useState(false);
   
   const [quantidade, setQuantidade] = useState(1);
-  const [jogosGerados, setJogosGerados] = useState([]);
+  const [resultadoGeracao, setResultadoGeracao] = useState(null);
   const [mensagemErro, setMensagemErro] = useState("");
   const [mensagemSucesso, setMensagemSucesso] = useState("");
 
@@ -62,14 +62,13 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          quantidade: parseInt(quantidade, 10) || 1,
-          max_interseccao: 12
+          quantidade: parseInt(quantidade, 10) || 1
         })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Erro inesperado.");
-      setJogosGerados(Array.isArray(data) ? data : [data]);
-      setMensagemSucesso("Bilhetes gerados com sucesso baseados na Matriz Preditiva!");
+      setResultadoGeracao(data);
+      setMensagemSucesso("Bilhetes evoluídos e lapidados com sucesso pelo Comitê Genético!");
     } catch (err) {
       setMensagemErro(err.message);
     } finally {
@@ -78,10 +77,10 @@ export default function App() {
   };
 
   return (
-    <div style={{ maxWidth: "1000px", margin: "0 auto", padding: "20px", fontFamily: "sans-serif" }}>
+    <div style={{ maxWidth: "1005px", margin: "0 auto", padding: "20px", fontFamily: "sans-serif" }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
-        <h2>🧠 Lotofácil Engine v5.0 - Dinâmica Preditiva</h2>
+        <h2>🧬 Lotofácil Engine v6.0 - Comitê Genético</h2>
         <div>
           <span style={{ marginRight: "10px", fontWeight: "bold" }}>
             API: {loadingStats ? "Carregando..." : estatisticas ? "🟢 Online" : "🔴 Offline"}
@@ -100,40 +99,40 @@ export default function App() {
       {mensagemErro && <div style={{ padding: "12px", backgroundColor: "#fee2e2", color: "#991b1b", borderRadius: "6px", marginBottom: "15px" }}>{mensagemErro}</div>}
       {mensagemSucesso && <div style={{ padding: "12px", backgroundColor: "#dcfce7", color: "#166534", borderRadius: "6px", marginBottom: "15px" }}>{mensagemSucesso}</div>}
 
-      {/* Cards Estatísticos (Agora Mostrando a Inteligência Dinâmica) */}
+      {/* Cards de Inteligência do Comitê */}
       {loadingStats ? (
-        <p>Avaliando matriz de co-ocorrência e dezenas em atraso...</p>
+        <p>Avaliando comitê de horizontes temporais (curto e longo prazo)...</p>
       ) : estatisticas ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "15px", marginBottom: "30px" }}>
           <div style={{ border: "1px solid #eab308", padding: "15px", borderRadius: "8px", backgroundColor: "#fefce8" }}>
-            <h4 style={{ margin: "0 0 10px 0", color: "#854d0e" }}>⚠️ Alerta de Atraso (Pressão)</h4>
+            <h4 style={{ margin: "0 0 10px 0", color: "#854d0e" }}>⚠️ Consenso de Atrasos (Comitê)</h4>
             <p style={{ margin: 0 }}>
               <strong>Dezenas Críticas:</strong> {
-                estatisticas.atrasos_reais?.dezenas_criticas?.length > 0 
-                ? estatisticas.atrasos_reais.dezenas_criticas.join(", ") 
-                : "Nenhuma dezena em atraso grave."
+                estatisticas.comite_horizontes?.dezenas_criticas?.length > 0 
+                ? estatisticas.comite_horizontes.dezenas_criticas.join(", ") 
+                : "Nenhuma dezena em alerta crítico."
               }
             </p>
-            <small style={{ color: "#a16207" }}>Têm alta propensão a sair no próximo.</small>
+            <small style={{ color: "#a16207" }}>Fusão analítica de 50 + total de concursos.</small>
           </div>
           
           <div style={{ border: "1px solid #3b82f6", padding: "15px", borderRadius: "8px", backgroundColor: "#eff6ff" }}>
-            <h4 style={{ margin: "0 0 10px 0", color: "#1d4ed8" }}>🤝 Matriz de Afinidade (Duplas)</h4>
+            <h4 style={{ margin: "0 0 10px 0", color: "#1d4ed8" }}>🤝 Afinidade Cruzada (Pares)</h4>
             <p style={{ margin: 0, fontSize: "14px" }}>
-              <strong>Top 5 Pares:</strong> {
-                estatisticas.co_ocorrencia?.top_pares?.slice(0, 5).map(p => `(${p[0]}&${p[1]})`).join(", ")
+              <strong>Pares de Consenso:</strong> {
+                estatisticas.comite_horizontes?.top_pares?.slice(0, 5).map(p => `(${p[0]}&${p[1]})`).join(", ")
               }
             </p>
-            <small style={{ color: "#2563eb" }}>Costumam ser sorteadas juntas.</small>
+            <small style={{ color: "#2563eb" }}>Pares validados em múltiplos horizontes.</small>
           </div>
         </div>
       ) : null}
 
-      {/* Gerador de Jogos */}
+      {/* Gerador Genético */}
       <div style={{ border: "1px solid #1e40af", padding: "20px", borderRadius: "8px", backgroundColor: "#f0f9ff" }}>
-        <h3>🚀 Gerador de Atrasos e Afinidade (Rigor Fixo)</h3>
+        <h3>🧬 Lapidação por Algoritmo Genético (Rigor Fixo: 150)</h3>
         <p style={{ color: "#475569", fontSize: "14px", marginTop:"-5px" }}>
-          O Score foi <strong>matematicamente cravado em 150 pontos (Teto 180)</strong>. Isso exige do robô alinhamento com padrões reais, mas preserva a folga de entropia necessária para os sorteios anômalos.
+          População de 300 bilhetes em evolução iterativa com cruzamento parental, mutação estocástica (18%) e pontuação mínima fixa em 150 pontos.
         </p>
         
         <div style={{ display: "flex", gap: "20px", alignItems: "center", marginBottom: "15px", marginTop: "15px", flexWrap: "wrap" }}>
@@ -141,7 +140,7 @@ export default function App() {
             <label style={{ marginRight: "10px", fontWeight: "bold" }}>Quantidade de Bilhetes:</label>
             <input 
               type="number" 
-              min="1" max="10" 
+              min="1" max="20" 
               value={quantidade} 
               onChange={(e) => setQuantidade(e.target.value)}
               style={{ width: "60px", padding: "6px", borderRadius: "4px", border: "1px solid #ccc" }}
@@ -150,7 +149,7 @@ export default function App() {
           
           <div>
             <span style={{ padding: "6px 12px", backgroundColor: "#e2e8f0", color: "#334155", borderRadius: "4px", fontWeight: "bold", border: "1px solid #cbd5e1" }}>
-              🔒 Filtro Trava: 150 Pontos
+              🔒 Trava Anti-Overfitting: 150 Pts
             </span>
           </div>
         </div>
@@ -160,31 +159,25 @@ export default function App() {
           disabled={loadingGerar}
           style={{ padding: "10px 20px", backgroundColor: "#1e40af", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
         >
-          {loadingGerar ? "Processando Matriz Preditiva..." : "💎 Gerar Bilhete(s)"}
+          {loadingGerar ? "Evolvendo Gerações Genéticas..." : "💎 Executar Lapidação Genética"}
         </button>
       </div>
 
-      {/* Exibição Formatada dos Jogos */}
-      {jogosGerados.length > 0 && (
+      {/* Exibição dos Bilhetes Diamante */}
+      {resultadoGeracao && resultadoGeracao.bilhetes && resultadoGeracao.bilhetes.length > 0 && (
         <div style={{ marginTop: "30px" }}>
-          <h3>🎟️ Bilhetes Filtrados</h3>
-          {jogosGerados.map((item, index) => {
-            const dezenasLista = item.bilhetes && Array.isArray(item.bilhetes[0]) 
-              ? item.bilhetes[0] : [];
+          <h3>🏆 Bilhetes Diamante (Gerados via {resultadoGeracao.estrategia})</h3>
+          <p style={{ color: "#555", fontSize: "13px" }}>
+            ⏱️ Ciclos evolutivos percorridos: <strong>{resultadoGeracao.geracoes_gastas} gerações</strong> | Score aplicado: <strong>{resultadoGeracao.score_aplicado}/180</strong>
+          </p>
 
-            return (
-              <div key={index} style={{ border: "1px solid #22c55e", padding: "15px", borderRadius: "8px", marginBottom: "10px", backgroundColor: "#f0fdf4" }}>
-                <p style={{ fontSize: "16px", fontWeight: "bold", color: "#166534", margin: "0 0 8px 0", letterSpacing: "1px" }}>
-                  Bilhete {index + 1}: {dezenasLista.length > 0 ? dezenasLista.join(" - ") : ""}
-                </p>
-                {item.tentativas_gastas !== undefined && (
-                  <p style={{ margin: "0", color: "#374151" }}>
-                    <small>⚡ Tentativas gastas: <strong>{item.tentativas_gastas}</strong> | Score: <strong>150/{item.score_maximo_arquitetura}</strong></small>
-                  </p>
-                )}
-              </div>
-            );
-          })}
+          {resultadoGeracao.bilhetes.map((bilhete, index) => (
+            <div key={index} style={{ border: "1px solid #22c55e", padding: "15px", borderRadius: "8px", marginBottom: "10px", backgroundColor: "#f0fdf4" }}>
+              <p style={{ fontSize: "16px", fontWeight: "bold", color: "#166534", margin: "0", letterSpacing: "1px" }}>
+                Bilhete {index + 1}: {bilhete.join(" - ")}
+              </p>
+            </div>
+          ))}
         </div>
       )}
     </div>
