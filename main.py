@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from engine import LotofacilGeneticEngine
 
-app = FastAPI(title="Lotofácil Engine API", version="6.0 - Comitê Genético")
+app = FastAPI(title="Lotofácil Engine API", version="7.0 - Comitê Genético + Diversidade")
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,6 +19,7 @@ app.add_middleware(
 
 NOME_ARQUIVO = "Lotofacil.xlsx"
 
+
 def carregar_engine():
     if os.path.exists(NOME_ARQUIVO):
         df = pd.read_excel(NOME_ARQUIVO)
@@ -26,18 +27,20 @@ def carregar_engine():
     else:
         raise RuntimeError(f"Arquivo '{NOME_ARQUIVO}' não foi encontrado.")
 
+
 engine, df_lotofacil = carregar_engine()
 
 
 class RequisicaoGerarJogos(BaseModel):
     quantidade: Optional[int] = 1
+    diversidade_minima: Optional[int] = 4
 
 
 @app.get("/")
 def home():
     return {
         "status": "online",
-        "mensagem": "Lotofácil API v6.0 (Comitê Genético Ativo. Score fixado em 150).",
+        "mensagem": "Lotofácil API v7.0 (Comitê Genético + Diversidade + Cache).",
         "concursos_carregados": len(engine.df)
     }
 
@@ -58,7 +61,12 @@ def obter_estatisticas():
 def gerar_jogos(req: RequisicaoGerarJogos):
     try:
         qtd = req.quantidade if req.quantidade is not None else 1
-        return engine.executar_geracao_genetica(quantidade_desejada=qtd, score_minimo=150)
+        diversidade = req.diversidade_minima if req.diversidade_minima is not None else 4
+        return engine.executar_geracao_genetica(
+            quantidade_desejada=qtd,
+            score_minimo=150,
+            diversidade_minima=diversidade,
+        )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Falha na geração genética: {str(e)}")
 
@@ -69,7 +77,7 @@ def recarregar_base_local():
     try:
         if os.path.exists(NOME_ARQUIVO):
             df_lotofacil = pd.read_excel(NOME_ARQUIVO)
-            engine = LotofacilGeneticEngine(df_lotofacil)
+            engine = LotofacilGeneticEngine(df_lotofacil)  # instância nova já nasce sem cache
             return {"sucesso": True, "mensagem": f"Base recarregada: {len(df_lotofacil)} concursos."}
         else:
             return {"sucesso": False, "mensagem": "Arquivo não encontrado."}
