@@ -1,25 +1,68 @@
-import pandas as pd
 import random
-from typing import List, Dict, Any, Optional
+from collections import Counter
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import pandas as pd
+
+PESOS_PADRAO: Dict[str, int] = {
+    "atraso": 30,
+    "co_ocorrencia": 30,
+    "paridade": 15,
+    "primos": 15,
+    "soma": 15,
+    "moldura": 15,
+    "repetidas_anterior": 30,
+    "sequencia": 15,
+}
+
+PRIMOS = {2, 3, 5, 7, 11, 13, 17, 19, 23}
+MOLDURA = {1, 2, 3, 4, 5, 6, 10, 11, 15, 16, 20, 21, 22, 23, 24, 25}
+
+# O volante da Lotofácil é uma grade 5x5:
+#  1  2  3  4  5
+#  6  7  8  9 10
+# 11 12 13 14 15
+# 16 17 18 19 20
+# 21 22 23 24 25
+LINHAS_VOLANTE = [set(range(i, i + 5)) for i in (1, 6, 11, 16, 21)]
+COLUNAS_VOLANTE = [set(range(c, 26, 5)) for c in (1, 2, 3, 4, 5)]
 
 
 class LotofacilGeneticEngine:
-    def __init__(self, df: pd.DataFrame):
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        pesos: Optional[Dict[str, int]] = None,
+        sorteios: Optional[List[List[int]]] = None,
+    ):
+        """
+        df: planilha com o histórico (do concurso mais antigo para o mais recente).
+        pesos: sobrescreve parte (ou todos) os pesos padrão. Usado no teste de ablação.
+        sorteios: histórico já extraído (lista de listas de 15 dezenas). Usado pelo
+                  backtest para não reprocessar a planilha inteira a cada rodada.
+        """
         self.df = df
         self.colunas_dezenas = self._identificar_colunas()
-        self.pesos = {
-            "atraso": 30,
-            "co_ocorrencia": 30,
-            "paridade": 15,
-            "primos": 15,
-            "soma": 15,
-            "moldura": 15,
-            "repetidas_anterior": 30,
-            "sequencia": 15
-        }
-        # Cache das análises de horizonte. Só é recalculado quando a base
-        # é recarregada (ver invalidar_cache) ou na primeira chamada.
+        self.pesos = dict(PESOS_PADRAO)
+        if pesos:
+            self.pesos.update(pesos)
+
+        self._sorteios: List[List[int]] = (
+            sorteios if sorteios is not None else self._extrair_todos_sorteios()
+        )
+        # Cache do comitê de horizontes; só muda quando a base muda.
         self._cache_comite: Optional[Dict[str, Any]] = None
+
+    # ------------------------------------------------------------------
+    # Base de dados
+    # ------------------------------------------------------------------
+    @property
+    def total_concursos(self) -> int:
+        return len(self._sorteios)
+
+    @property
+    def pontuacao_maxima(self) -> int:
+        return sum(self.pesos.values())
 
     def _identificar_colunas(self) -> List[str]:
         cols = []
@@ -32,7 +75,7 @@ class LotofacilGeneticEngine:
         return list(cols)
 
     def invalidar_cache(self):
-        """Chame isso sempre que self.df mudar (ex: recarregar planilha)."""
+        """Chame isso sempre que o histórico mudar."""
         self._cache_comite = None
 
     def _extrair_dezenas_linha(self, row) -> List[int]:
@@ -46,25 +89,27 @@ class LotofacilGeneticEngine:
                 pass
         return dezenas
 
+    def _extrair_todos_sorteios(self) -> List[List[int]]:
+        sorteios: List[List[int]] = []
+        for _, row in self.df.iterrows():
+            dezenas = self._extrair_dezenas_linha(row)
+            if len(dezenas) == 15:  # ignora linhas incompletas/malformadas
+                sorteios.append(sorted(dezenas))
+        return sorteios
+
     def obter_ultimo_concurso(self) -> List[int]:
-        if self.df.empty:
-            return []
-        return self._extrair_dezenas_linha(self.df.iloc[-1])
+        return list(self._sorteios[-1]) if self._sorteios else []
 
-    def _analisar_horizonte(self, sub_df: pd.DataFrame) -> Dict[str, Any]:
-        """
-        Versão O(n): uma única passada pelo sub_df calcula o atraso de
-        todas as 25 dezenas simultaneamente (antes era O(25*n)), e os
-        pares de co-ocorrência na mesma passada.
-        """
-        n = len(sub_df)
-        ultimo_indice_visto = {i: None for i in range(1, 26)}
-        pares: Dict[tuple, int] = {}
+    # ------------------------------------------------------------------
+    # Análise estatística (comitê de horizontes)
+    # ------------------------------------------------------------------
+    def _analisar_horizonte(self, sorteios: List[List[int]]) -> Dict[str, Any]:
+        """Uma única passada calcula o atraso de todas as dezenas e os pares."""
+        n = len(sorteios)
+        ultimo_indice_visto: Dict[int, Optional[int]] = {i: None for i in range(1, 26)}
+        pares: Dict[Tuple[int, int], int] = {}
 
-        # Percorre do concurso mais antigo para o mais recente
-        for pos in range(n):
-            row = sub_df.iloc[pos]
-            dezenas = sorted(self._extrair_dezenas_linha(row))
+        for pos, dezenas in enumerate(sorteios):
             for d in dezenas:
                 ultimo_indice_visto[d] = pos
             for i in range(len(dezenas)):
@@ -75,10 +120,8 @@ class LotofacilGeneticEngine:
         atrasos = {}
         for i in range(1, 26):
             if ultimo_indice_visto[i] is None:
-                # Nunca apareceu na janela: atraso = tamanho da janela
                 atrasos[i] = n
             else:
-                # Quantos concursos se passaram desde a última aparição
                 atrasos[i] = (n - 1) - ultimo_indice_visto[i]
 
         criticas = [k for k, v in atrasos.items() if v >= 3]
@@ -87,17 +130,12 @@ class LotofacilGeneticEngine:
         return {"criticas": criticas, "top_pares": top_pares, "atrasos": atrasos}
 
     def comite_de_horizontes(self, forcar_recalculo: bool = False) -> Dict[str, Any]:
-        """Ensemble combinando curto prazo (50 concursos) e longo prazo (total).
-        Resultado é cacheado em memória: recalcular esse ensemble em toda
-        chamada de /api/estatisticas ou a cada bilhete gerado é desperdício,
-        já que só muda quando a planilha é recarregada.
-        """
+        """Ensemble entre curto prazo (50 concursos) e longo prazo (todos). Cacheado."""
         if self._cache_comite is not None and not forcar_recalculo:
             return self._cache_comite
 
-        df_curto = self.df.tail(min(50, len(self.df)))
-        analise_curto = self._analisar_horizonte(df_curto)
-        analise_longo = self._analisar_horizonte(self.df)
+        analise_curto = self._analisar_horizonte(self._sorteios[-50:])
+        analise_longo = self._analisar_horizonte(self._sorteios)
 
         criticas_consenso = list(set(analise_curto["criticas"] + analise_longo["criticas"]))
         pares_consenso = list(set(analise_curto["top_pares"][:5] + analise_longo["top_pares"][:5]))
@@ -109,6 +147,9 @@ class LotofacilGeneticEngine:
         self._cache_comite = resultado
         return resultado
 
+    # ------------------------------------------------------------------
+    # Pontuação de um bilhete
+    # ------------------------------------------------------------------
     def calcular_fitness(self, dezenas: List[int], stats: Dict[str, Any], ultimo_concurso: List[int]) -> int:
         score = 0
         dezenas_set = set(dezenas)
@@ -121,7 +162,7 @@ class LotofacilGeneticEngine:
         if pares in [7, 8]:
             score += self.pesos["paridade"]
 
-        primos = len([n for n in dezenas if n in {2, 3, 5, 7, 11, 13, 17, 19, 23}])
+        primos = len([n for n in dezenas if n in PRIMOS])
         if primos in [5, 6]:
             score += self.pesos["primos"]
 
@@ -136,13 +177,10 @@ class LotofacilGeneticEngine:
         if max_seq <= 4:
             score += self.pesos["sequencia"]
 
-        moldura = len(dezenas_set.intersection({1, 2, 3, 4, 5, 6, 10, 11, 15, 16, 20, 21, 22, 23, 24, 25}))
+        moldura = len(dezenas_set.intersection(MOLDURA))
         if moldura in [9, 10, 11]:
             score += self.pesos["moldura"]
 
-        # CORREÇÃO: antes, quando não havia dezenas críticas, o score
-        # de "atraso" era dado de graça sempre (bug). Agora só pontua
-        # quando existe de fato uma dezena crítica presente no bilhete.
         criticas = set(stats.get("dezenas_criticas", []))
         if criticas and len(dezenas_set.intersection(criticas)) >= 1:
             score += self.pesos["atraso"]
@@ -152,8 +190,6 @@ class LotofacilGeneticEngine:
         if pares_presentes >= 2:
             score += self.pesos["co_ocorrencia"]
 
-        # CORREÇÃO: mesma lógica — só pontua "grátis" se de fato não
-        # houver concurso anterior para comparar (base vazia).
         if ultimo_concurso:
             repetidas = len(dezenas_set.intersection(set(ultimo_concurso)))
             if 8 <= repetidas <= 10:
@@ -163,6 +199,22 @@ class LotofacilGeneticEngine:
 
         return score
 
+    @staticmethod
+    def _padrao_popular(bilhete: List[int]) -> bool:
+        """
+        Heurística leve: marca bilhetes com 2+ linhas ou 2+ colunas COMPLETAS do
+        volante. São desenhos "visuais" que tendem a ser apostados por muita gente.
+        Não há dado público de popularidade por combinação; isso é só uma suposição
+        razoável e pode ser desligada (evitar_populares=False).
+        """
+        s = set(bilhete)
+        linhas_completas = sum(1 for linha in LINHAS_VOLANTE if linha <= s)
+        colunas_completas = sum(1 for coluna in COLUNAS_VOLANTE if coluna <= s)
+        return linhas_completas >= 2 or colunas_completas >= 2
+
+    # ------------------------------------------------------------------
+    # Operadores genéticos
+    # ------------------------------------------------------------------
     def _cruzar_bilhetes(self, pai1: List[int], pai2: List[int]) -> List[int]:
         filho = list(set(random.sample(pai1, 8) + random.sample(pai2, 7)))
         while len(filho) < 15:
@@ -183,25 +235,25 @@ class LotofacilGeneticEngine:
 
     @staticmethod
     def _distancia_minima(candidato: List[int], selecionados: List[List[int]]) -> int:
-        """Menor número de dezenas diferentes entre `candidato` e qualquer
-        bilhete já selecionado. Usado para forçar diversidade."""
+        """Menor número de dezenas diferentes entre o candidato e os já escolhidos."""
         if not selecionados:
             return 15
         cand_set = set(candidato)
         return min(len(cand_set.symmetric_difference(set(s))) for s in selecionados)
 
-    def executar_geracao_genetica(
+    # ------------------------------------------------------------------
+    # Geração de candidatos + seleção em portfólio
+    # ------------------------------------------------------------------
+    def gerar_candidatos(
         self,
-        quantidade_desejada: int = 1,
-        score_minimo: int = 150,
-        diversidade_minima: int = 4,
-    ) -> Dict[str, Any]:
+        alvo: int,
+        score_minimo: int,
+        evitar_populares: bool = True,
+        max_geracoes: int = 50,
+    ) -> Tuple[List[Tuple[List[int], int]], int]:
         """
-        diversidade_minima: número mínimo de dezenas que cada novo bilhete
-        aprovado precisa ter de diferença em relação a TODOS os bilhetes já
-        escolhidos (medido em diferença simétrica). Evita que, com
-        score_minimo alto, os bilhetes aprovados saiam praticamente clones
-        uns dos outros. Use 0 para desligar esse filtro.
+        Evolui a população e junta bilhetes aprovados (sem repetição) até chegar
+        em `alvo` candidatos. Retorna (lista de (bilhete, score), gerações usadas).
         """
         stats = self.comite_de_horizontes()
         ultimo = self.obter_ultimo_concurso()
@@ -209,47 +261,141 @@ class LotofacilGeneticEngine:
         populacao_tamanho = 300
         populacao = [sorted(random.sample(range(1, 26), 15)) for _ in range(populacao_tamanho)]
 
-        geracao_atual = 0
-        max_geracoes = 50
-        bilhetes_diamante: List[List[int]] = []
-        geracoes_gastas = 0
+        candidatos: List[Tuple[List[int], int]] = []
+        vistos: Set[Tuple[int, ...]] = set()
+        geracoes = 0
 
-        while len(bilhetes_diamante) < quantidade_desejada and geracao_atual < max_geracoes:
-            geracao_atual += 1
-            geracoes_gastas = geracao_atual
+        while len(candidatos) < alvo and geracoes < max_geracoes:
+            geracoes += 1
 
             avaliados = [(b, self.calcular_fitness(b, stats, ultimo)) for b in populacao]
             avaliados.sort(key=lambda x: x[1], reverse=True)
 
-            aprovados_geracao = [b for b, score in avaliados if score >= score_minimo]
-
-            for b in aprovados_geracao:
-                if b in bilhetes_diamante:
+            for b, score in avaliados:
+                if score < score_minimo:
+                    break  # lista ordenada: o resto é pior
+                chave = tuple(b)
+                if chave in vistos:
                     continue
-                if diversidade_minima > 0 and self._distancia_minima(b, bilhetes_diamante) < diversidade_minima:
+                if evitar_populares and self._padrao_popular(b):
                     continue
-                bilhetes_diamante.append(b)
-                if len(bilhetes_diamante) >= quantidade_desejada:
-                    break
+                vistos.add(chave)
+                candidatos.append((b, score))
 
-            if len(bilhetes_diamante) >= quantidade_desejada:
+            if len(candidatos) >= alvo:
                 break
 
-            melhores_pais = [b for b, score in avaliados[:int(populacao_tamanho * 0.3)]]
-
+            melhores_pais = [b for b, _ in avaliados[:int(populacao_tamanho * 0.3)]]
             nova_populacao = list(melhores_pais)
             while len(nova_populacao) < populacao_tamanho:
                 p1, p2 = random.choices(melhores_pais, k=2)
                 filho = self._cruzar_bilhetes(p1, p2)
                 filho = self._mutar_bilhete(filho, taxa_mutacao=0.18)
                 nova_populacao.append(filho)
-
             populacao = nova_populacao
 
-        return {
-            "bilhetes": bilhetes_diamante[:quantidade_desejada],
-            "geracoes_gastas": geracoes_gastas,
+        return candidatos, geracoes
+
+    def selecionar_portfolio(
+        self,
+        candidatos: List[Tuple[List[int], int]],
+        quantidade: int,
+        diversidade_minima: int = 4,
+        peso_equilibrio: float = 2.0,
+    ) -> List[List[int]]:
+        """
+        Escolhe `quantidade` bilhetes como um CONJUNTO, não um a um.
+
+        A cada passo, escolhe o candidato de menor custo:
+            custo = peso_equilibrio * carga - score / 30
+        onde `carga` é a média de vezes que as dezenas do candidato já foram usadas
+        nos bilhetes escolhidos. Isso empurra o conjunto para usar todas as dezenas
+        de forma parelha (nenhuma dezena fica "todo mundo depende dela"), sem
+        abrir mão do score. Se a diversidade mínima esgotar os candidatos, ela é
+        relaxada em 1 dezena por vez.
+        """
+        selecionados: List[List[int]] = []
+        contagem = {d: 0 for d in range(1, 26)}
+        restantes = list(candidatos)
+        diversidade_atual = diversidade_minima
+
+        while restantes and len(selecionados) < quantidade:
+            n_sel = len(selecionados)
+            melhor_idx = None
+            melhor_custo = None
+
+            for idx, (b, score) in enumerate(restantes):
+                if diversidade_atual > 0 and self._distancia_minima(b, selecionados) < diversidade_atual:
+                    continue
+                carga = sum(contagem[d] for d in b) / max(1, n_sel)
+                custo = peso_equilibrio * carga - score / 30 + random.random() * 0.01
+                if melhor_custo is None or custo < melhor_custo:
+                    melhor_custo = custo
+                    melhor_idx = idx
+
+            if melhor_idx is None:
+                if diversidade_atual > 0:
+                    diversidade_atual -= 1
+                    continue
+                break
+
+            b, _ = restantes.pop(melhor_idx)
+            selecionados.append(b)
+            for d in b:
+                contagem[d] += 1
+
+        return selecionados
+
+    def executar_geracao_genetica(
+        self,
+        quantidade_desejada: int = 1,
+        score_minimo: int = 150,
+        diversidade_minima: int = 4,
+        evitar_populares: bool = True,
+        peso_equilibrio: float = 2.0,
+    ) -> Dict[str, Any]:
+        alvo = max(quantidade_desejada * 5, 30)
+        candidatos, geracoes = self.gerar_candidatos(alvo, score_minimo, evitar_populares)
+        bilhetes = self.selecionar_portfolio(
+            candidatos, quantidade_desejada, diversidade_minima, peso_equilibrio
+        )
+
+        frequencia = Counter(d for b in bilhetes for d in b)
+        distancia_real = None
+        if len(bilhetes) >= 2:
+            distancia_real = min(
+                len(set(bilhetes[i]).symmetric_difference(set(bilhetes[j])))
+                for i in range(len(bilhetes)) for j in range(i + 1, len(bilhetes))
+            )
+
+        resposta: Dict[str, Any] = {
+            "bilhetes": bilhetes,
+            "geracoes_gastas": geracoes,
             "score_aplicado": score_minimo,
+            "pontuacao_maxima": self.pontuacao_maxima,
             "diversidade_minima_aplicada": diversidade_minima,
-            "estrategia": "Comitê Genético com Mutação Estocástica + Diversidade (v7.0)"
+            "distancia_minima_real": distancia_real,
+            "frequencia_dezenas": {d: frequencia.get(d, 0) for d in range(1, 26)},
+            "candidatos_avaliados": len(candidatos),
+            "estrategia": "Comitê Genético + Portfólio Balanceado (v8.0)",
         }
+        if len(bilhetes) < quantidade_desejada:
+            resposta["aviso"] = (
+                f"Só foi possível montar {len(bilhetes)} de {quantidade_desejada} bilhetes "
+                f"com score >= {score_minimo}."
+            )
+        return resposta
+
+    # ------------------------------------------------------------------
+    # Sugestão de dezenas para desdobramento
+    # ------------------------------------------------------------------
+    def sugerir_pool_dezenas(self, tamanho: int = 17, score_minimo: int = 150) -> List[int]:
+        """
+        Sugere `tamanho` dezenas contando quais aparecem mais nos bilhetes de maior
+        score. Sem vantagem preditiva comprovada: é um ponto de partida. O caminho
+        principal do desdobramento é você informar as dezenas que quiser.
+        """
+        candidatos, _ = self.gerar_candidatos(200, score_minimo, evitar_populares=False)
+        freq = Counter(d for b, _ in candidatos for d in b)
+        ranking = sorted(range(1, 26), key=lambda d: (-freq[d], random.random()))
+        return sorted(ranking[:tamanho])
