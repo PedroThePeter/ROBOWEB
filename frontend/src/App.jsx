@@ -8,7 +8,7 @@ export default function App() {
   const [loadingGerar, setLoadingGerar] = useState(false);
   const [loadingRecarregar, setLoadingRecarregar] = useState(false);
   
-  const [quantidade, setQuantidade] = useState(1);
+  const [quantidade, setQuantidade] = useState(10);
   const [resultadoGeracao, setResultadoGeracao] = useState(null);
   const [mensagemErro, setMensagemErro] = useState("");
   const [mensagemSucesso, setMensagemSucesso] = useState("");
@@ -68,7 +68,11 @@ export default function App() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Erro inesperado.");
       setResultadoGeracao(data);
-      setMensagemSucesso("Bilhetes evoluídos e lapidados com sucesso pelo Comitê Genético!");
+      if (data.aviso) {
+        setMensagemErro(data.aviso);
+      } else {
+        setMensagemSucesso("Bilhetes evoluídos e lapidados com sucesso pelo Comitê Genético!");
+      }
     } catch (err) {
       setMensagemErro(err.message);
     } finally {
@@ -80,7 +84,7 @@ export default function App() {
     <div style={{ maxWidth: "1005px", margin: "0 auto", padding: "20px", fontFamily: "sans-serif" }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
-        <h2>🧬 Lotofácil Engine v6.0 - Comitê Genético</h2>
+        <h2>🧬 Lotofácil Engine v8.0 - Portfólio + Desdobramento</h2>
         <div>
           <span style={{ marginRight: "10px", fontWeight: "bold" }}>
             API: {loadingStats ? "Carregando..." : estatisticas ? "🟢 Online" : "🔴 Offline"}
@@ -132,7 +136,8 @@ export default function App() {
       <div style={{ border: "1px solid #1e40af", padding: "20px", borderRadius: "8px", backgroundColor: "#f0f9ff" }}>
         <h3>🧬 Lapidação por Algoritmo Genético (Rigor Fixo: 150)</h3>
         <p style={{ color: "#475569", fontSize: "14px", marginTop:"-5px" }}>
-          População de 300 bilhetes em evolução iterativa com cruzamento parental, mutação estocástica (18%) e pontuação mínima fixa em 150 pontos.
+          População de 300 bilhetes em evolução iterativa com cruzamento parental, mutação estocástica (18%),
+          seleção em portfólio balanceado e pontuação mínima fixa em 150 pontos.
         </p>
         
         <div style={{ display: "flex", gap: "20px", alignItems: "center", marginBottom: "15px", marginTop: "15px", flexWrap: "wrap" }}>
@@ -168,7 +173,13 @@ export default function App() {
         <div style={{ marginTop: "30px" }}>
           <h3>🏆 Bilhetes Diamante (Gerados via {resultadoGeracao.estrategia})</h3>
           <p style={{ color: "#555", fontSize: "13px" }}>
-            ⏱️ Ciclos evolutivos percorridos: <strong>{resultadoGeracao.geracoes_gastas} gerações</strong> | Score aplicado: <strong>{resultadoGeracao.score_aplicado}/180</strong>
+            ⏱️ Ciclos evolutivos percorridos: <strong>{resultadoGeracao.geracoes_gastas} gerações</strong> {" | "}
+            Score aplicado: <strong>{resultadoGeracao.score_aplicado}/{resultadoGeracao.pontuacao_maxima ?? 165}</strong>
+            {resultadoGeracao.distancia_minima_real !== null && resultadoGeracao.distancia_minima_real !== undefined && (
+              <>
+                {" | "}Diversidade real entre bilhetes: <strong>{resultadoGeracao.distancia_minima_real} dezenas</strong>
+              </>
+            )}
           </p>
 
           {resultadoGeracao.bilhetes.map((bilhete, index) => (

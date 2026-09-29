@@ -43,9 +43,20 @@ class LotofacilGeneticEngine:
         """
         self.df = df
         self.colunas_dezenas = self._identificar_colunas()
-        self.pesos = dict(PESOS_PADRAO)
-        if pesos:
+
+        if pesos is not None:
+            # Chamada explícita (ex: backtest.py testando um conjunto específico de
+            # pesos) tem prioridade sobre qualquer trava — travar não deve impedir
+            # que vocês testem hipóteses, só impedir ajuste silencioso no dia a dia.
+            self.pesos = dict(PESOS_PADRAO)
             self.pesos.update(pesos)
+        else:
+            try:
+                from integridade import carregar_pesos_para_engine
+                self.pesos = carregar_pesos_para_engine()
+            except ImportError:
+                # integridade.py não está na pasta: comportamento de sempre.
+                self.pesos = dict(PESOS_PADRAO)
 
         self._sorteios: List[List[int]] = (
             sorteios if sorteios is not None else self._extrair_todos_sorteios()

@@ -1,0 +1,12 @@
+{
+  "pesos": {
+    "atraso": 30,
+    "co_ocorrencia": 30,
+    "paridade": 15,
+    "primos": 15,
+    "soma": 15,
+    "moldura": 15,
+    "repetidas_anterior": 30,
+    "sequencia": 15
+  }
+}
