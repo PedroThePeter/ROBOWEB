@@ -1,9 +1,9 @@
 import os
 import json
 from typing import Optional
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 import engine
@@ -28,6 +28,21 @@ app.add_middleware(
 )
 
 
+# --- Trata Erros 404 Retornando a Rota Exata Solicitada pelo React ---
+
+@app.exception_handler(404)
+async def custom_404_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=404,
+        content={
+            "status": "erro",
+            "mensagem": f"A rota [{request.method}] {request.url.path} nao foi encontrada no backend.",
+            "detail": "Not Found",
+            "sugestao": "Verifique se a URL no frontend possui barra no final, prefixo /api/ ou metodo HTTP correto (GET/POST)."
+        }
+    )
+
+
 # --- Modelos de Dados (Schemas Pydantic) ---
 
 class RequisicaoGerarJogos(BaseModel):
@@ -44,6 +59,7 @@ class RequisicaoRotinaDiaria(BaseModel):
 # --- Endpoints da API ---
 
 @app.get("/")
+@app.get("/api")
 def root():
     """Endpoint de verificação de integridade e estado do servidor."""
     return {
@@ -62,13 +78,27 @@ def root():
     }
 
 @app.get("/api/status")
+@app.get("/status")
 def api_status():
     """Retorna o status simplificado da API para validação do frontend."""
     return {"status": "online", "sistema": "Lotofácil IA v8.0"}
 
+# Mapeamento de rotas de historico/dados com suporte a barra no final
 @app.get("/api/historico")
+@app.get("/api/historico/")
 @app.get("/api/palpites")
+@app.get("/api/palpites/")
 @app.get("/api/diario")
+@app.get("/api/diario/")
+@app.get("/api/dados")
+@app.get("/api/dados/")
+@app.get("/api/carregar-dados")
+@app.get("/api/carregar-dados/")
+@app.post("/api/historico")
+@app.post("/api/palpites")
+@app.post("/api/diario")
+@app.post("/api/dados")
+@app.post("/api/carregar-dados")
 def api_obter_historico():
     """Retorna os dados consolidados do diário e últimos palpites registrados."""
     try:
@@ -84,23 +114,13 @@ def api_obter_historico():
             detail=f"Erro ao carregar histórico do diário: {str(e)}"
         )
 
-@app.post("/api/gerar-jogos")
-def api_gerar_jogos(req: RequisicaoGerarJogos):
-    """
-    Gera combinações estatísticas baseadas na seleção ponderada pelos pesos ativos
-    e validação de integridade criptográfica SHA-256.
-    """
-    try:
-        qtd = req.quantidade if (req.quantidade and req.quantidade > 0) else 10
-        resultado = engine.gerar_jogos_genetico(quantidade=qtd, concurso=req.concurso)
-        return resultado
-    except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Falha na geração genética: {str(e)}"
-        )
-
+# Mapeamento para os botões "Recarregar Planilha" e "Recarregar Base"
 @app.post("/api/recarregar-base")
+@app.post("/api/recarregar-base/")
+@app.post("/api/recarregar-planilha")
+@app.post("/api/recarregar-planilha/")
+@app.get("/api/recarregar-base")
+@app.get("/api/recarregar-planilha")
 def api_recarregar_base():
     """
     Recarrega a base de dados histórica, reavalia os pesos estatísticos
@@ -123,7 +143,31 @@ def api_recarregar_base():
             detail=f"Erro ao recarregar a base: {str(e)}"
         )
 
+# Mapeamento de geração de jogos e lapidação genética
+@app.post("/api/gerar-jogos")
+@app.post("/api/gerar-jogos/")
+@app.post("/api/gerar-bilhetes")
+@app.post("/api/gerar-bilhetes/")
+@app.post("/api/lapidacao")
+@app.post("/api/lapidacao/")
+def api_gerar_jogos(req: Optional[RequisicaoGerarJogos] = None):
+    """
+    Gera combinações estatísticas baseadas na seleção ponderada pelos pesos ativos
+    e validação de integridade criptográfica SHA-256.
+    """
+    try:
+        qtd = req.quantidade if (req and req.quantidade and req.quantidade > 0) else 10
+        concurso = req.concurso if req else None
+        resultado = engine.gerar_jogos_genetico(quantidade=qtd, concurso=concurso)
+        return resultado
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Falha na geração genética: {str(e)}"
+        )
+
 @app.post("/api/rotina-diaria")
+@app.post("/api/rotina-diaria/")
 def api_executar_rotina_diaria(req: RequisicaoRotinaDiaria):
     """Executa o pipeline diário de simulação, salvamento de diário e atualização do painel."""
     try:
@@ -156,6 +200,7 @@ def api_executar_rotina_diaria(req: RequisicaoRotinaDiaria):
         )
 
 @app.get("/api/pesos")
+@app.get("/api/pesos/")
 def api_obter_pesos():
     """Retorna o estado atual do dicionário de pesos e o status de validação da trava."""
     try:
