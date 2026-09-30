@@ -154,3 +154,26 @@ def _main() -> None:
 
 if __name__ == "__main__":
     _main()
+import math
+
+def dezenas_para_mask(dezenas):
+    """Converte uma lista de dezenas num inteiro com bitmask."""
+    mask = 0
+    for d in dezenas:
+        mask |= (1 << (d - 1))
+    return mask
+
+def contar_intersecao_mask(mask1, mask2):
+    """Conta bits em comum usando operações bitwise aceleradas."""
+    return bin(mask1 & mask2).count("1")
+
+def calcular_comb(n, k):
+    if k < 0 or k > n:
+        return 0
+    return math.comb(n, k)
+
+def calcular_probabilidade_grupo(k):
+    """Calcula a probabilidade combinatória C(K,15)/C(25,15)."""
+    if k < 15 or k > 25:
+        raise ValueError("O grupo deve ter entre 15 e 25 dezenas.")
+    return calcular_comb(k, 15) / calcular_comb(25, 15)    

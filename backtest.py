@@ -251,3 +251,23 @@ if __name__ == "__main__":
         random.seed(args.semente)
 
     rodar_backtest(args.planilha, args.inicio, args.passo, args.bilhetes, args.score_minimo, args.ablacao)
+    import statistics
+
+def calcular_ic95_t_student(amostra):
+    """Calcula a média, intervalos de confiança e margem de erro via t-Student (95%)."""
+    if not amostra:
+        return 0.0, 0.0, 0.0, 0.0
+    media = statistics.mean(amostra)
+    n = len(amostra)
+    if n < 2:
+        return media, media, media, 0.0
+    desvio = statistics.stdev(amostra)
+    
+    try:
+        from scipy.stats import t
+        t_crit = t.ppf(0.975, df=n-1)
+    except ImportError:
+        t_crit = 2.262 if n == 10 else 2.0  # Fallback seguro
+        
+    margem = t_crit * (desvio / (n ** 0.5))
+    return media, media - margem, media + margem, margem

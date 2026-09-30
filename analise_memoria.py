@@ -310,3 +310,14 @@ if __name__ == "__main__":
         autopsia(sorteios, args.dezena)
     else:
         relatorio_geral(sorteios)
+import math
+from scipy.stats import norm
+
+def calcular_z_bonferroni(num_testes=1, alpha=0.05):
+    """Calcula o limiar z ajustado pela correção de Bonferroni."""
+    alpha_ajustado = alpha / num_testes
+    return abs(norm.ppf(alpha_ajustado / 2))
+
+def validar_frequencia_repetidas_esperada():
+    """Retorna a média teórica de dezenas repetidas do concurso anterior."""
+    return 9.0

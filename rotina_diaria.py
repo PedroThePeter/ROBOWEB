@@ -117,3 +117,7 @@ if __name__ == "__main__":
         sys.exit("--quantidade precisa ser pelo menos 1.")
 
     rodar(args)
+import painel_auditoria
+
+# No final da execução da rotina diária:
+painel_auditoria.main()
