@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 import engine
 import integridade
+import diario
 import rotina_diaria
 import painel_auditoria
 
@@ -60,6 +61,29 @@ def root():
         ]
     }
 
+@app.get("/api/status")
+def api_status():
+    """Retorna o status simplificado da API para validação do frontend."""
+    return {"status": "online", "sistema": "Lotofácil IA v8.0"}
+
+@app.get("/api/historico")
+@app.get("/api/palpites")
+@app.get("/api/diario")
+def api_obter_historico():
+    """Retorna os dados consolidados do diário e últimos palpites registrados."""
+    try:
+        dados = diario.obter_dados_diario()
+        return {
+            "status": "sucesso",
+            "historico": dados.get("historico", []),
+            "ultimos_palpites": dados.get("ultimos_palpites", [])
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao carregar histórico do diário: {str(e)}"
+        )
+
 @app.post("/api/gerar-jogos")
 def api_gerar_jogos(req: RequisicaoGerarJogos):
     """
@@ -76,6 +100,29 @@ def api_gerar_jogos(req: RequisicaoGerarJogos):
             detail=f"Falha na geração genética: {str(e)}"
         )
 
+@app.post("/api/recarregar-base")
+def api_recarregar_base():
+    """
+    Recarrega a base de dados histórica, reavalia os pesos estatísticos
+    e atualiza a trava criptográfica.
+    """
+    try:
+        pesos, valido = integridade.carregar_pesos_para_engine()
+        
+        if hasattr(painel_auditoria, "gerar_relatorio_html"):
+            painel_auditoria.gerar_relatorio_html()
+            
+        return {
+            "status": "sucesso",
+            "mensagem": "Base estatística e trava criptográfica recarregadas com sucesso.",
+            "trava_valida": valido
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao recarregar a base: {str(e)}"
+        )
+
 @app.post("/api/rotina-diaria")
 def api_executar_rotina_diaria(req: RequisicaoRotinaDiaria):
     """Executa o pipeline diário de simulação, salvamento de diário e atualização do painel."""
@@ -89,13 +136,11 @@ def api_executar_rotina_diaria(req: RequisicaoRotinaDiaria):
 
         args = Args()
         
-        # Executa a rotina diária
         if hasattr(rotina_diaria, "rodar"):
             rotina_diaria.rodar(args)
         elif hasattr(rotina_diaria, "executar"):
             rotina_diaria.executar(args)
 
-        # Atualiza automaticamente o relatório estático de auditoria
         if hasattr(painel_auditoria, "gerar_relatorio_html"):
             painel_auditoria.gerar_relatorio_html()
 
@@ -137,7 +182,6 @@ def api_exibir_painel_auditoria():
         with open(caminho_html, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), status_code=200)
             
-    # Tenta gerar o painel caso ainda não exista no disco
     try:
         if hasattr(painel_auditoria, "gerar_relatorio_html"):
             painel_auditoria.gerar_relatorio_html()
@@ -154,6 +198,5 @@ def api_exibir_painel_auditoria():
 
 if __name__ == "__main__":
     import uvicorn
-    # Lê a porta atribuída pelo Render via variável de ambiente, padrão 8000
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
