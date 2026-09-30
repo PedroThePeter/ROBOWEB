@@ -7,6 +7,21 @@ def extrair_pesos_dict(pesos_input):
         return pesos_input[0]
     return pesos_input
 
+class LotofacilGeneticEngine:
+    """Classe wrapper para compatibilidade com rotina_diaria e outros módulos que instanciam o motor."""
+    def __init__(self, caminho_pesos=None):
+        self.caminho_pesos = caminho_pesos
+
+    def gerar_jogos(self, quantidade=10, concurso=None):
+        return gerar_jogos_genetico(
+            quantidade=quantidade, 
+            concurso=concurso, 
+            caminho_pesos=self.caminho_pesos
+        )
+
+    def executar(self, quantidade=10, concurso=None):
+        return self.gerar_jogos(quantidade=quantidade, concurso=concurso)
+
 def gerar_jogos_genetico(quantidade=10, concurso=None, caminho_pesos=None):
     """
     Gera palpites da Lotofácil utilizando seleção ponderada baseada nos pesos estatísticos ativos.
