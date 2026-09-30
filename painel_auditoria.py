@@ -90,5 +90,9 @@ def gerar_relatorio_html(caminho_saida="auditoria.html"):
     except Exception:
         return False
 
+def main():
+    """Ponto de entrada padrão exigido por chamadas externas a painel_auditoria.main()."""
+    return gerar_relatorio_html()
+
 if __name__ == "__main__":
-    gerar_relatorio_html()
+    main()
