@@ -10,6 +10,9 @@ def salvar_palpites(dados_jogos, caminho_arquivo=None):
     alvo = caminho_arquivo if caminho_arquivo else ARQUIVO_PALPITES
     historico = carregar_palpites(alvo)
     
+    if isinstance(historico, dict):
+        historico = historico.get("historico", [])
+
     registro = {
         "data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "concurso": dados_jogos.get("concurso"),
@@ -38,3 +41,21 @@ def carregar_palpites(caminho_arquivo=None):
         except Exception:
             return []
     return []
+
+def obter_dados_diario(caminho_arquivo=None):
+    """Retorna um dicionário padronizado contendo historico e ultimos_palpites para compatibilidade."""
+    historico = carregar_palpites(caminho_arquivo)
+    ultimos = []
+    
+    if isinstance(historico, list) and historico:
+        ultimo_reg = historico[-1]
+        if isinstance(ultimo_reg, dict):
+            ultimos = ultimo_reg.get("jogos", [])
+    elif isinstance(historico, dict):
+        ultimos = historico.get("ultimos_palpites", [])
+        historico = historico.get("historico", [])
+
+    return {
+        "historico": historico,
+        "ultimos_palpites": ultimos
+    }
