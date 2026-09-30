@@ -106,7 +106,8 @@ def api_obter_historico():
         return {
             "status": "sucesso",
             "historico": dados.get("historico", []),
-            "ultimos_palpites": dados.get("ultimos_palpites", [])
+            "ultimos_palpites": dados.get("ultimos_palpites", []),
+            "jogos": dados.get("ultimos_palpites", [])
         }
     except Exception as e:
         raise HTTPException(
@@ -159,6 +160,10 @@ def api_gerar_jogos(req: Optional[RequisicaoGerarJogos] = None):
         qtd = req.quantidade if (req and req.quantidade and req.quantidade > 0) else 10
         concurso = req.concurso if req else None
         resultado = engine.gerar_jogos_genetico(quantidade=qtd, concurso=concurso)
+        
+        # Salva automaticamente no diário
+        diario.salvar_palpites(resultado)
+        
         return resultado
     except Exception as e:
         raise HTTPException(

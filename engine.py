@@ -77,6 +77,7 @@ def gerar_jogos_genetico(quantidade=10, concurso=None, caminho_pesos=None):
         "concurso": concurso,
         "quantidade": quantidade,
         "jogos": jogos_gerados,
+        "bilhetes": jogos_gerados,  # Suporte duplo para interfaces que leem 'bilhetes'
         "hashes": hashes,
         "trava_valida": valido
     }
