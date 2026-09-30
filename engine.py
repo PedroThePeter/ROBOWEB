@@ -1,5 +1,5 @@
 import random
-from integridade import carregar_pesos_para_engine, _hash_bilhete
+from integridade import carregar_pesos_para_engine, _hash_bilhete, PESOS_PADRAO
 
 def extrair_pesos_dict(pesos_input):
     """Garante a extração do dicionário de pesos, mesmo que venha em formato de tupla (pesos, valido)."""
