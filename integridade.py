@@ -2,8 +2,9 @@ import hashlib
 import json
 import os
 
-# Constante da trava exigida pelos testes
+# Constantes de arquivos de auditoria e trava do sistema
 ARQUIVO_TRAVA = "trava.json"
+ARQUIVO_COMPROVANTES = "comprovantes.csv"
 
 # Pesos padrão do sistema
 PESOS_PADRAO = {str(i): 1.0 for i in range(1, 26)}
