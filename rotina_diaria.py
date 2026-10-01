@@ -1,82 +1,102 @@
-import os
+"""
+Rotina do fim do dia, num só comando:
+  1. Gera os bilhetes com o motor local.
+  2. Grava o comprovante de hash (comprovantes.csv) ANTES do sorteio.
+  3. Registra os bilhetes no diário (palpites.json).
+  4. Atualiza o painel de auditoria (auditoria.html).
+
+USO
+    python rotina_diaria.py --concurso 3800
+    python rotina_diaria.py --concurso 3800 --quantidade 10
+    python rotina_diaria.py --concurso 3800 --sem-commit    (pula o comprovante)
+    python rotina_diaria.py --concurso 3800 --sem-diario    (pula o diário)
+
+Depois do sorteio:  python diario.py conferir Lotofacil.xlsx
+
+Importar este módulo (como o main.py faz) não executa nada: tudo roda só dentro de
+executar() ou do bloco __main__.
+"""
+
 import argparse
+import sys
 from datetime import datetime
 
-# Importa os módulos do ecossistema
-import engine
 import diario
-import painel_auditoria
+import engine
 import integridade
+import painel_auditoria
 
-def executar(args):
-    """
-    Executa o pipeline diário:
-    1. Gera novos jogos usando o motor genético.
-    2. Salva os resultados no diário (palpites.json).
-    3. Atualiza o painel de auditoria estático (auditoria.html).
-    """
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Iniciando Rotina Diária...")
 
-    # Extrai os parâmetros recebidos (da API no main.py ou do terminal)
-    concurso = getattr(args, 'concurso', None)
-    quantidade = getattr(args, 'quantidade', 10)
-    sem_diario = getattr(args, 'sem_diario', False)
-    
+def _log(msg: str) -> None:
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
+
+
+def executar(args) -> dict:
+    """Pipeline diário. Aceita argparse.Namespace ou qualquer objeto com os mesmos atributos."""
+    concurso = getattr(args, "concurso", None)
+    quantidade = getattr(args, "quantidade", 10) or 10
+    sem_commit = getattr(args, "sem_commit", False)
+    sem_diario = getattr(args, "sem_diario", False)
+
+    _log("Iniciando rotina diária...")
     try:
-        # Passo 1: Gerar os jogos com o motor genético (já com o novo contrato que retorna 'jogos' e 'bilhetes')
-        print(f"Gerando {quantidade} jogos para o concurso {concurso or 'atual'}...")
-        dados_gerados = engine.gerar_jogos_genetico(quantidade=quantidade, concurso=concurso)
-        
-        # Passo 2: Salvar no diário (se a flag --sem-diario não estiver ativa)
-        if not sem_diario:
-            sucesso_diario = diario.salvar_palpites(dados_gerados)
-            if sucesso_diario:
-                print("✅ Jogos salvos no diário de palpites com sucesso.")
-            else:
-                print("⚠️ Aviso: Falha ao salvar no diário de palpites.")
-        else:
-            print("⏭️ Salvamento no diário ignorado (--sem-diario).")
+        _log(f"Gerando {quantidade} bilhetes para o concurso {concurso or 'não informado'}...")
+        dados = engine.gerar_jogos_genetico(quantidade=quantidade, concurso=concurso)
 
-        # Passo 3: Atualizar o painel de auditoria de forma segura
-        # A chamada OCORRE APENAS AQUI DENTRO, nunca na raiz do arquivo.
-        print("Atualizando Painel de Auditoria...")
-        if hasattr(painel_auditoria, "gerar_relatorio_html"):
-            painel_auditoria.gerar_relatorio_html()
-        elif hasattr(painel_auditoria, "main"):
-            painel_auditoria.main()
-            
-        print("🚀 Rotina Diária concluída com sucesso!")
+        comprovantes = None
+        if sem_commit:
+            _log("Comprovante de integridade ignorado (--sem-commit).")
+        elif concurso is None:
+            _log("AVISO: sem número de concurso não há como gravar comprovante.")
+        else:
+            novos, repetidos = integridade.registrar_comprovantes(concurso, dados["bilhetes"])
+            comprovantes = {"novos": novos, "ja_existiam": repetidos}
+            _log(f"Comprovantes: {novos} novo(s), {repetidos} já existia(m).")
+
+        if sem_diario:
+            _log("Diário ignorado (--sem-diario).")
+        elif diario.salvar_palpites(dados, origem="rotina"):
+            _log("Bilhetes registrados no diário.")
+        else:
+            _log("AVISO: não consegui gravar o diário.")
+
+        if painel_auditoria.gerar_relatorio_html():
+            _log("Painel de auditoria atualizado.")
+        else:
+            _log("AVISO: não consegui gravar o painel de auditoria.")
+
+        _log("Rotina diária concluída.")
         return {
             "status": "sucesso",
             "concurso": concurso,
             "quantidade": quantidade,
-            "jogos_gerados": dados_gerados.get("jogos", [])
+            "jogos_gerados": dados["jogos"],
+            "comprovantes": comprovantes,
         }
-
     except Exception as e:
-        erro_msg = f"Erro durante a rotina diária: {str(e)}"
-        print(f"❌ {erro_msg}")
-        return {
-            "status": "erro",
-            "mensagem": erro_msg
-        }
+        msg = f"Erro durante a rotina diária: {e}"
+        _log(msg)
+        return {"status": "erro", "mensagem": msg}
 
-def rodar(args):
-    """Alias para manter compatibilidade com módulos antigos que chamem rotina_diaria.rodar()"""
+
+def rodar(args) -> dict:
+    """Alias de compatibilidade."""
     return executar(args)
 
-# ==============================================================================
-# Bloco de execução via Terminal / Linha de Comando
-# Tudo o que está aqui dentro SÓ RODA se você digitar `python rotina_diaria.py`
-# Ignorado completamente durante imports (como o import feito pelo main.py)
-# ==============================================================================
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Rotina Diária - Lotofácil IA v8.0")
-    parser.add_argument("--concurso", type=int, default=None, help="Número do concurso alvo")
-    parser.add_argument("--quantidade", type=int, default=10, help="Quantidade de bilhetes a gerar")
-    parser.add_argument("--sem-commit", action="store_true", help="Ignorar commit no git (legado)")
-    parser.add_argument("--sem-diario", action="store_true", help="Não salvar os jogos gerados no diário")
-    
-    argumentos_cli = parser.parse_args()
-    
-    executar(argumentos_cli)
+    parser = argparse.ArgumentParser(description="Rotina diária - Lotofácil IA v8.0")
+    parser.add_argument("--concurso", type=int, required=True, help="Número do concurso alvo (o próximo a sortear)")
+    parser.add_argument("--quantidade", type=int, default=10, help="Quantidade de bilhetes (1 a 100)")
+    parser.add_argument("--sem-commit", action="store_true", help="Não grava o comprovante de integridade")
+    parser.add_argument("--sem-diario", action="store_true", help="Não registra no diário de palpites")
+    argumentos = parser.parse_args()
+
+    if not (1 <= argumentos.quantidade <= engine.QUANTIDADE_MAXIMA):
+        sys.exit(f"--quantidade precisa estar entre 1 e {engine.QUANTIDADE_MAXIMA}.")
+
+    resultado = executar(argumentos)
+    if resultado["status"] != "sucesso":
+        sys.exit(1)
+    for i, b in enumerate(resultado["jogos_gerados"], 1):
+        print(f"  Bilhete {i:2d}: {','.join(str(d) for d in b)}")

@@ -2,7 +2,7 @@
 Desdobramento (fechamento) para a Lotofácil.
 
 IDEIA
-Você escolhe um grupo de K dezenas (16 a 18). O módulo gera o MENOR conjunto de
+Você escolhe um grupo de K dezenas (16 a 18). O módulo gera um conjunto pequeno de
 bilhetes de 15 dezenas, todos formados só com essas K dezenas, que GARANTE um
 mínimo de acertos (ex: 14) SE as 15 dezenas sorteadas estiverem todas dentro do
 seu grupo.
@@ -16,7 +16,8 @@ dezenas do grupo (conjunto E). O número de acertos vira:
 
 Então "garantir G acertos" equivale a: para todo M possível, algum bilhete tem
 |M ∩ E| >= G - (30 - K). É um problema de cobertura; resolvemos com o algoritmo
-guloso clássico (bem próximo do mínimo) e depois VERIFICAMOS por força bruta.
+guloso clássico (próximo do mínimo, mas não necessariamente o mínimo absoluto) e
+depois VERIFICAMOS por força bruta.
 
 LIMITE HONESTO
 A garantia só vale se as 15 sorteadas caírem dentro das suas K dezenas.
@@ -42,10 +43,36 @@ GARANTIA_MIN = 11
 GARANTIA_MAX = 14
 
 
+# ----------------------------------------------------------------------
+# Utilitários (bitmask e probabilidade)
+# ----------------------------------------------------------------------
+def dezenas_para_mask(dezenas) -> int:
+    """Converte uma lista de dezenas num inteiro com bitmask (dezena d -> bit d-1)."""
+    mask = 0
+    for d in dezenas:
+        mask |= 1 << (d - 1)
+    return mask
+
+
+def contar_intersecao_mask(mask1: int, mask2: int) -> int:
+    """Conta as dezenas em comum entre duas máscaras."""
+    return bin(mask1 & mask2).count("1")
+
+
+def calcular_probabilidade_grupo(k: int) -> float:
+    """Probabilidade de as 15 sorteadas caírem num grupo de k dezenas: C(k,15)/C(25,15)."""
+    if k < 15 or k > 25:
+        raise ValueError("O grupo deve ter entre 15 e 25 dezenas.")
+    return math.comb(k, 15) / math.comb(25, 15)
+
+
 def probabilidade_pool_conter_sorteio(tamanho_pool: int) -> float:
-    return math.comb(tamanho_pool, 15) / math.comb(25, 15)
+    return calcular_probabilidade_grupo(tamanho_pool)
 
 
+# ----------------------------------------------------------------------
+# Desdobramento
+# ----------------------------------------------------------------------
 def _validar(dezenas: List[int], garantia: int) -> None:
     if len(set(dezenas)) != len(dezenas):
         raise ValueError("Há dezenas repetidas na lista.")
@@ -65,11 +92,11 @@ def verificar_desdobramento(dezenas: List[int], bilhetes: List[List[int]]) -> Di
     Força bruta: para CADA sorteio possível dentro do grupo, calcula o melhor
     resultado entre os bilhetes. Retorna {melhor_acerto: quantos_sorteios}.
     """
-    masks_bilhetes = [sum(1 << d for d in b) for b in bilhetes]
+    masks_bilhetes = [dezenas_para_mask(b) for b in bilhetes]
     distribuicao: Counter = Counter()
     for sorteio in combinations(dezenas, 15):
-        mask_sorteio = sum(1 << d for d in sorteio)
-        melhor = max(bin(mask_sorteio & mb).count("1") for mb in masks_bilhetes)
+        mask_sorteio = dezenas_para_mask(sorteio)
+        melhor = max(contar_intersecao_mask(mask_sorteio, mb) for mb in masks_bilhetes)
         distribuicao[melhor] += 1
     return dict(sorted(distribuicao.items()))
 
@@ -114,7 +141,7 @@ def gerar_desdobramento(dezenas: List[int], garantia: int = 14) -> Dict[str, Any
 
     distribuicao = verificar_desdobramento(dezenas, bilhetes)
     garantia_ok = min(distribuicao) >= garantia
-    prob = probabilidade_pool_conter_sorteio(k)
+    prob = calcular_probabilidade_grupo(k)
 
     return {
         "dezenas": dezenas,
@@ -154,26 +181,3 @@ def _main() -> None:
 
 if __name__ == "__main__":
     _main()
-import math
-
-def dezenas_para_mask(dezenas):
-    """Converte uma lista de dezenas num inteiro com bitmask."""
-    mask = 0
-    for d in dezenas:
-        mask |= (1 << (d - 1))
-    return mask
-
-def contar_intersecao_mask(mask1, mask2):
-    """Conta bits em comum usando operações bitwise aceleradas."""
-    return bin(mask1 & mask2).count("1")
-
-def calcular_comb(n, k):
-    if k < 0 or k > n:
-        return 0
-    return math.comb(n, k)
-
-def calcular_probabilidade_grupo(k):
-    """Calcula a probabilidade combinatória C(K,15)/C(25,15)."""
-    if k < 15 or k > 25:
-        raise ValueError("O grupo deve ter entre 15 e 25 dezenas.")
-    return calcular_comb(k, 15) / calcular_comb(25, 15)    

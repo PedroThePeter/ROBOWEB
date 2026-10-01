@@ -28,9 +28,7 @@ from collections import Counter, defaultdict
 from itertools import combinations
 from typing import Dict, List, Optional, Tuple
 
-import pandas as pd
-
-from engine import LotofacilGeneticEngine
+from dados import carregar_sorteios
 
 P_DEZENA = 15 / 25                                   # 60%
 P_PAR = (15 * 14) / (25 * 24)                        # 35%
@@ -57,6 +55,16 @@ def z_bonferroni(n_testes: int, alfa: float = 0.05) -> float:
         else:
             alto = meio
     return (baixo + alto) / 2
+
+
+def calcular_z_bonferroni(num_testes: int = 1, alpha: float = 0.05) -> float:
+    """Mesmo cálculo de z_bonferroni, com os nomes de parâmetro usados nos testes."""
+    return z_bonferroni(num_testes, alpha)
+
+
+def validar_frequencia_repetidas_esperada() -> float:
+    """Média teórica de dezenas repetidas do concurso anterior (15*15/25 = 9,0)."""
+    return MEDIA_REPETIDAS
 
 
 def qui2_pvalor(x: float, graus: int) -> float:
@@ -178,7 +186,7 @@ def relatorio_geral(sorteios: List[List[int]]) -> None:
     else:
         print("    => Nenhuma dezena foge do esperado.")
 
-    # 2) Repetição
+    # 2) Repetição (dois critérios: média e qui-quadrado -> alfa dividido por 2)
     rep = teste_repeticao(sorteios)
     print("\n[2] REPETIÇÃO DO CONCURSO ANTERIOR")
     print(f"    Média observada: {rep['media']:.3f} (esperado {MEDIA_REPETIDAS:.1f}), z = {rep['z']:+.2f}")
@@ -186,11 +194,11 @@ def relatorio_geral(sorteios: List[List[int]]) -> None:
     for nome, obs, esp in rep["linhas"]:
         print(f"                  {nome:>6s} {obs:6d} {esp:9.1f}")
     print(f"    Qui-quadrado = {rep['qui2']:.1f}, p ≈ {rep['p_qui2']:.3f}")
-    if abs(rep["z"]) > 1.96 or rep["p_qui2"] < 0.05:
+    if abs(rep["z"]) > z_bonferroni(2) or rep["p_qui2"] < 0.025:
         achados += 1
         print("    => ATENÇÃO: a repetição difere do acaso puro.")
     else:
-        print("    => Compatível com acaso puro. A faixa 8-10 usada no robô é só a mais comum,")
+        print("    => Compatível com acaso puro. A faixa 8-10 é só a mais comum,")
         print("       não uma condição que aumenta a chance de acerto.")
 
     # 3) Atraso
@@ -208,8 +216,7 @@ def relatorio_geral(sorteios: List[List[int]]) -> None:
         print("    => ATENÇÃO: a chance de sair muda conforme o atraso.")
     else:
         print("    => A taxa fica em ~60% qualquer que seja o atraso: nenhuma evidência de")
-        print("       'dívida' que o sorteio precise pagar. O critério de dezenas críticas não")
-        print("       encontra apoio nestes dados.")
+        print("       'dívida' que o sorteio precise pagar.")
 
     # 4) Pares
     pares = teste_pares(sorteios)
@@ -236,8 +243,9 @@ def relatorio_geral(sorteios: List[List[int]]) -> None:
         print("e desdobramento) e medir o desempenho real com o diário de palpites.")
     else:
         print(f"CONCLUSÃO: {achados} teste(s) apontaram desvio do acaso puro.")
-        print("Isso merece investigação, mas NÃO prova que dá para prever. Próximo passo:")
-        print("validar fora da amostra (backtest walk-forward) usando exatamente esse padrão.")
+        print("Isso merece investigação, mas NÃO prova que dá para prever (são 4 testes sem correção")
+        print("entre si; um achado isolado pode ser acaso). Próximo passo: validar fora da amostra")
+        print("(backtest walk-forward) usando exatamente esse padrão.")
 
 
 def autopsia(sorteios: List[List[int]], dezena: int) -> None:
@@ -254,8 +262,8 @@ def autopsia(sorteios: List[List[int]], dezena: int) -> None:
     print("não sai: quem apostou nela e viu ela faltar passou por uma situação comum.\n")
 
     recentes = presencas[-30:]
-    print("Últimos 30 concursos (■ saiu, □ não saiu; o mais recente é o da direita):")
-    print("   " + "".join("■" if p else "□" for p in recentes))
+    print("Últimos 30 concursos (X saiu, . não saiu; o mais recente é o da direita):")
+    print("   " + "".join("X" if p else "." for p in recentes))
 
     atual = 0
     for p in reversed(presencas):
@@ -272,11 +280,11 @@ def autopsia(sorteios: List[List[int]], dezena: int) -> None:
     print("    Se as taxas ficam perto de 60% para todo K, o passado recente não ajuda a")
     print("    prever essa dezena. (Amostras pequenas oscilam bastante.)")
 
-    companheiras = []
     com = [s for s in sorteios if dezena in s]
     if com:
         esperado = 14 / 24
         desvio = math.sqrt(esperado * (1 - esperado) / len(com))
+        companheiras = []
         for outra in range(1, 26):
             if outra == dezena:
                 continue
@@ -289,11 +297,6 @@ def autopsia(sorteios: List[List[int]], dezena: int) -> None:
         print(f"    Limite de Bonferroni (24 comparações): |z| > {z_bonferroni(24):.2f}")
 
 
-def carregar_sorteios(caminho: str) -> List[List[int]]:
-    df = pd.read_excel(caminho)
-    return LotofacilGeneticEngine(df)._sorteios
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Testa se o histórico da Lotofácil tem padrões além do acaso")
     parser.add_argument("planilha", help="Caminho para Lotofacil.xlsx")
@@ -303,6 +306,8 @@ if __name__ == "__main__":
     sorteios = carregar_sorteios(args.planilha)
     if len(sorteios) < 100:
         print(f"Base com só {len(sorteios)} concursos válidos: pequena demais para testes confiáveis.")
+    if len(sorteios) < 2:
+        raise SystemExit("Preciso de pelo menos 2 concursos para analisar.")
 
     if args.dezena is not None:
         if not 1 <= args.dezena <= 25:
@@ -310,14 +315,3 @@ if __name__ == "__main__":
         autopsia(sorteios, args.dezena)
     else:
         relatorio_geral(sorteios)
-import math
-from scipy.stats import norm
-
-def calcular_z_bonferroni(num_testes=1, alpha=0.05):
-    """Calcula o limiar z ajustado pela correção de Bonferroni."""
-    alpha_ajustado = alpha / num_testes
-    return abs(norm.ppf(alpha_ajustado / 2))
-
-def validar_frequencia_repetidas_esperada():
-    """Retorna a média teórica de dezenas repetidas do concurso anterior."""
-    return 9.0

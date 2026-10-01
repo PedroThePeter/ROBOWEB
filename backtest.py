@@ -1,23 +1,20 @@
 """
-Backtest v2 (walk-forward) para o LotofacilGeneticEngine.
+Backtest walk-forward do motor da Lotofácil.
 
-Para cada concurso alvo N, a engine só enxerga os concursos anteriores a N,
-gera bilhetes e é comparada com bilhetes aleatórios NO MESMO concurso.
+Para cada concurso alvo N, o motor só enxerga os concursos anteriores a N: calcula
+pesos por frequência (janela dos últimos --janela concursos), gera bilhetes e é
+comparado com bilhetes aleatórios NO MESMO concurso.
 
-O que a v2 acrescenta:
-  1. Taxa de bilhetes premiados (11+ acertos), que é o que realmente paga.
-  2. Comparação PAREADA por rodada com intervalo de confiança de 95% (t de Student).
-     Se o intervalo inclui zero, a diferença não se distingue do acaso. O baseline
-     usa 200 bilhetes aleatórios por rodada para não injetar ruído na comparação.
-     (Mesmo assim, ~5% dos testes sobre dados puramente aleatórios saem "significativos"
-     por acaso: é assim que um intervalo de 95% funciona.)
-  3. Valores teóricos de um bilhete aleatório, para conferir o baseline.
-  4. Teste de ablação (--ablacao): remove um critério por vez e mede o efeito.
+Mede:
+  1. Média de acertos.
+  2. Taxa de bilhetes premiados (11+ acertos), que é o que realmente paga.
+  3. Diferença PAREADA por rodada com intervalo de confiança de 95% (t de Student).
+     Se o intervalo inclui zero, a diferença não se distingue do acaso.
+  4. Valores teóricos de um bilhete aleatório, para conferir o baseline.
 
 Uso:
     python backtest.py Lotofacil.xlsx --inicio 100 --passo 10 --bilhetes 3
-    python backtest.py Lotofacil.xlsx --inicio 100 --passo 30 --bilhetes 3 --ablacao
-    python backtest.py Lotofacil.xlsx --semente 42      # resultado reproduzível
+    python backtest.py Lotofacil.xlsx --janela 50 --semente 42
 """
 
 import argparse
@@ -26,17 +23,15 @@ import random
 import statistics
 import sys
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-import pandas as pd
+import engine
+from dados import carregar_sorteios
 
-from engine import LotofacilGeneticEngine, PESOS_PADRAO
+LIMITE_PREMIO = 11          # a Lotofácil paga de 11 a 15 acertos
+BILHETES_BASELINE = 200     # bilhetes aleatórios por rodada (baseline pouco ruidoso)
 
-LIMITE_PREMIO = 11  # a Lotofácil paga de 11 a 15 acertos
-BILHETES_BASELINE = 200  # bilhetes aleatórios por rodada (baseline pouco ruidoso)
-
-# Valor crítico t (bicaudal, 95%) por graus de liberdade. Com poucas rodadas, usar
-# 1,96 (normal) deixaria o intervalo estreito demais e geraria falsos positivos.
+# Valor crítico t (bicaudal, 95%) por graus de liberdade (sem depender do scipy).
 _T975 = {
     1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306,
     9: 2.262, 10: 2.228, 11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131,
@@ -65,15 +60,30 @@ def media_teorica() -> float:
 
 def taxa_premio_teorica() -> float:
     total = math.comb(25, 15)
-    favoraveis = sum(
-        math.comb(15, k) * math.comb(10, 15 - k) for k in range(LIMITE_PREMIO, 16)
-    )
+    favoraveis = sum(math.comb(15, k) * math.comb(10, 15 - k) for k in range(LIMITE_PREMIO, 16))
     return favoraveis / total
 
 
 # ----------------------------------------------------------------------
-# Métricas
+# Estatística
 # ----------------------------------------------------------------------
+def calcular_ic95_t_student(amostra):
+    """Retorna (média, limite_inferior, limite_superior, margem) com IC de 95% por t de Student."""
+    if not amostra:
+        return 0.0, 0.0, 0.0, 0.0
+    media = statistics.mean(amostra)
+    n = len(amostra)
+    if n < 2:
+        return media, media, media, 0.0
+    margem = _t_critico(n - 1) * statistics.stdev(amostra) / math.sqrt(n)
+    return media, media - margem, media + margem, margem
+
+
+def ic95(valores: List[float]):
+    media, inferior, superior, _ = calcular_ic95_t_student(valores)
+    return media, inferior, superior
+
+
 def metricas_bilhetes(bilhetes: List[List[int]], real: set) -> Dict[str, float]:
     acertos = [len(real.intersection(b)) for b in bilhetes]
     return {
@@ -81,16 +91,6 @@ def metricas_bilhetes(bilhetes: List[List[int]], real: set) -> Dict[str, float]:
         "taxa": sum(1 for a in acertos if a >= LIMITE_PREMIO) / len(acertos),
         "acertos": acertos,
     }
-
-
-def ic95(valores: List[float]):
-    n = len(valores)
-    media = statistics.mean(valores)
-    if n < 2:
-        return media, media, media
-    erro = statistics.stdev(valores) / math.sqrt(n)
-    t = _t_critico(n - 1)
-    return media, media - t * erro, media + t * erro
 
 
 def diferencas_pareadas(a: Dict[int, dict], b: Dict[int, dict], chave: str) -> List[float]:
@@ -109,12 +109,6 @@ def veredito(inferior: float, superior: float) -> str:
 # ----------------------------------------------------------------------
 # Execução
 # ----------------------------------------------------------------------
-def carregar_base(caminho: str):
-    df = pd.read_excel(caminho)
-    sorteios = LotofacilGeneticEngine(df)._sorteios
-    return df, sorteios
-
-
 def rodar_baseline(sorteios: List[List[int]], alvos: List[int]) -> Dict[int, dict]:
     saida = {}
     for idx in alvos:
@@ -123,39 +117,25 @@ def rodar_baseline(sorteios: List[List[int]], alvos: List[int]) -> Dict[int, dic
     return saida
 
 
-def rodar_engine(
-    df: pd.DataFrame,
-    sorteios: List[List[int]],
-    alvos: List[int],
-    n_bilhetes: int,
-    pesos: Optional[Dict[str, int]],
-    score_minimo: int,
-    rotulo: str,
-) -> Dict[int, dict]:
+def rodar_engine(sorteios: List[List[int]], alvos: List[int], n_bilhetes: int, janela: int) -> Dict[int, dict]:
     saida = {}
     inicio = time.time()
     for k, idx in enumerate(alvos, 1):
-        engine = LotofacilGeneticEngine(df.iloc[:idx], pesos=pesos, sorteios=sorteios[:idx])
-        resultado = engine.executar_geracao_genetica(
-            quantidade_desejada=n_bilhetes, score_minimo=score_minimo
-        )
-        if not resultado["bilhetes"]:
-            continue
+        pesos = engine.pesos_por_frequencia(sorteios[:idx], janela or None)  # só o passado
+        resultado = engine.gerar_jogos_genetico(quantidade=n_bilhetes, pesos=pesos)
         saida[idx] = metricas_bilhetes(resultado["bilhetes"], set(sorteios[idx]))
         if k % 50 == 0:
-            print(f"   [{rotulo}] {k}/{len(alvos)} rodadas ({time.time() - inicio:.0f}s)")
+            print(f"   [engine] {k}/{len(alvos)} rodadas ({time.time() - inicio:.0f}s)")
     return saida
 
 
-def imprimir_resultado_principal(eng: Dict[int, dict], base: Dict[int, dict], n_bilhetes: int):
+def imprimir_resultado_principal(eng: Dict[int, dict], base: Dict[int, dict]):
     comuns = sorted(set(eng) & set(base))
     todos_eng = [a for i in comuns for a in eng[i]["acertos"]]
     todos_base = [a for i in comuns for a in base[i]["acertos"]]
 
-    d_media = diferencas_pareadas(eng, base, "media")
-    d_taxa = diferencas_pareadas(eng, base, "taxa")
-    m_media, lo_media, hi_media = ic95(d_media)
-    m_taxa, lo_taxa, hi_taxa = ic95(d_taxa)
+    m_media, lo_media, hi_media = ic95(diferencas_pareadas(eng, base, "media"))
+    m_taxa, lo_taxa, hi_taxa = ic95(diferencas_pareadas(eng, base, "taxa"))
 
     print("\n" + "=" * 68)
     print(f"RESULTADO — {len(comuns)} rodadas, {len(todos_eng)} bilhetes da engine")
@@ -169,6 +149,7 @@ def imprimir_resultado_principal(eng: Dict[int, dict], base: Dict[int, dict], n_
     print("\nDiferença engine - aleatório (pareada por rodada, IC 95% t de Student):")
     print(f"  Média de acertos : {m_media:+.3f}  [{lo_media:+.3f} ; {hi_media:+.3f}]  => {veredito(lo_media, hi_media)}")
     print(f"  Taxa de 11+      : {m_taxa * 100:+.2f} p.p. [{lo_taxa * 100:+.2f} ; {hi_taxa * 100:+.2f}]  => {veredito(lo_taxa, hi_taxa)}")
+    print("  (Mesmo com dados puramente aleatórios, ~5% dos testes saem 'significativos' por acaso.)")
 
     print("\nDistribuição de acertos da engine:")
     for n in range(LIMITE_PREMIO, 16):
@@ -177,42 +158,8 @@ def imprimir_resultado_principal(eng: Dict[int, dict], base: Dict[int, dict], n_
             print(f"  {n} acertos: {qtd}x")
 
 
-def rodar_ablacao(df, sorteios, alvos, n_bilhetes, score_minimo, base, eng_completa):
-    razao = score_minimo / sum(PESOS_PADRAO.values())
-    print("\n" + "=" * 68)
-    print("ABLAÇÃO — removendo um critério por vez (score mínimo proporcional)")
-    print("=" * 68)
-    linhas = []
-    for criterio in PESOS_PADRAO:
-        pesos = dict(PESOS_PADRAO)
-        pesos[criterio] = 0
-        sm = round(razao * sum(pesos.values()))
-        res = rodar_engine(df, sorteios, alvos, n_bilhetes, pesos, sm, f"sem {criterio}")
-
-        d_base = diferencas_pareadas(res, base, "media")
-        d_full = diferencas_pareadas(res, eng_completa, "media")
-        if len(d_base) < 2 or len(d_full) < 2:
-            continue
-        m_b, lo_b, hi_b = ic95(d_base)
-        m_f, lo_f, hi_f = ic95(d_full)
-        linhas.append((criterio, sm, m_b, lo_b, hi_b, m_f, lo_f, hi_f))
-
-    print(f"{'Sem o critério':22s}{'Score mín':>10s}{'Δ vs aleatório [IC95%]':>32s}{'Δ vs engine completa [IC95%]':>34s}")
-    for criterio, sm, m_b, lo_b, hi_b, m_f, lo_f, hi_f in linhas:
-        print(
-            f"{criterio:22s}{sm:10d}"
-            f"{m_b:+10.3f} [{lo_b:+.3f};{hi_b:+.3f}]"
-            f"{m_f:+12.3f} [{lo_f:+.3f};{hi_f:+.3f}]"
-        )
-    print(
-        "\nComo ler: se remover um critério NÃO piora o resultado (Δ vs completa perto de 0,\n"
-        "intervalo incluindo 0), ele não está contribuindo. Atenção: ao testar 8 critérios,\n"
-        "um deles pode parecer relevante só por acaso; desconfie de um resultado isolado."
-    )
-
-
-def rodar_backtest(caminho, inicio, passo, n_bilhetes, score_minimo, ablacao):
-    df, sorteios = carregar_base(caminho)
+def rodar_backtest(caminho: str, inicio: int, passo: int, n_bilhetes: int, janela: int) -> None:
+    sorteios = carregar_sorteios(caminho)
     total = len(sorteios)
 
     if inicio >= total:
@@ -220,54 +167,25 @@ def rodar_backtest(caminho, inicio, passo, n_bilhetes, score_minimo, ablacao):
         sys.exit(1)
 
     alvos = list(range(inicio, total, passo))
-    print(f"Base: {total} concursos válidos | {len(alvos)} rodadas | {n_bilhetes} bilhetes por rodada")
+    print(f"Base: {total} concursos válidos | {len(alvos)} rodadas | {n_bilhetes} bilhetes por rodada | janela {janela or 'toda a base'}")
     print(f"Sorteio teórico: média {media_teorica():.3f} acertos, {taxa_premio_teorica() * 100:.2f}% dos bilhetes com 11+")
 
     base = rodar_baseline(sorteios, alvos)
-    eng = rodar_engine(df, sorteios, alvos, n_bilhetes, None, score_minimo, "engine")
-
-    if not eng:
-        print("Nenhuma rodada produziu bilhetes (score mínimo alto demais?).")
-        return
-
-    imprimir_resultado_principal(eng, base, n_bilhetes)
-
-    if ablacao:
-        rodar_ablacao(df, sorteios, alvos, n_bilhetes, score_minimo, base, eng)
+    eng = rodar_engine(sorteios, alvos, n_bilhetes, janela)
+    imprimir_resultado_principal(eng, base)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Backtest walk-forward v2 da LotofacilGeneticEngine")
+    parser = argparse.ArgumentParser(description="Backtest walk-forward do motor da Lotofácil")
     parser.add_argument("planilha", help="Caminho para Lotofacil.xlsx")
     parser.add_argument("--inicio", type=int, default=100, help="Primeiro concurso (índice) a testar")
     parser.add_argument("--passo", type=int, default=10, help="De quantos em quantos concursos testar")
-    parser.add_argument("--bilhetes", type=int, default=3, help="Bilhetes gerados por rodada")
-    parser.add_argument("--score-minimo", type=int, default=150, help="Score mínimo usado na engine")
-    parser.add_argument("--ablacao", action="store_true", help="Roda também o teste de ablação (demora mais)")
+    parser.add_argument("--bilhetes", type=int, default=3, help="Bilhetes gerados por rodada (1 a 100)")
+    parser.add_argument("--janela", type=int, default=100, help="Concursos passados usados nos pesos (0 = todos)")
     parser.add_argument("--semente", type=int, default=None, help="Semente aleatória para resultado reproduzível")
     args = parser.parse_args()
 
     if args.semente is not None:
         random.seed(args.semente)
 
-    rodar_backtest(args.planilha, args.inicio, args.passo, args.bilhetes, args.score_minimo, args.ablacao)
-    import statistics
-
-def calcular_ic95_t_student(amostra):
-    """Calcula a média, intervalos de confiança e margem de erro via t-Student (95%)."""
-    if not amostra:
-        return 0.0, 0.0, 0.0, 0.0
-    media = statistics.mean(amostra)
-    n = len(amostra)
-    if n < 2:
-        return media, media, media, 0.0
-    desvio = statistics.stdev(amostra)
-    
-    try:
-        from scipy.stats import t
-        t_crit = t.ppf(0.975, df=n-1)
-    except ImportError:
-        t_crit = 2.262 if n == 10 else 2.0  # Fallback seguro
-        
-    margem = t_crit * (desvio / (n ** 0.5))
-    return media, media - margem, media + margem, margem
+    rodar_backtest(args.planilha, args.inicio, args.passo, args.bilhetes, args.janela)

@@ -1,45 +1,44 @@
-import os
 import json
-import pytest
-from integridade import _hash_bilhete, _hash_pesos, carregar_pesos_para_engine, PESOS_PADRAO
+import integridade
+from integridade import PESOS_PADRAO
 
-def test_hash_bilhete_determinismo():
-    """Garante que a ordem das dezenas não altera a hash SHA-256 gerada."""
-    bilhete_a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-    bilhete_b = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
-    
-    assert _hash_bilhete(bilhete_a) == _hash_bilhete(bilhete_b)
-    assert len(_hash_bilhete(bilhete_a)) == 64  # SHA-256 produz 64 caracteres hexa
 
-def test_hash_pesos_alteracao_detectada():
-    """Valida se qualquer modificação nos pesos altera a hash de verificação."""
-    pesos_1 = {"soma": 1.0, "pares": 0.8}
-    pesos_2 = {"soma": 1.0, "pares": 0.81}  # Pequena alteração
-    
-    assert _hash_pesos(pesos_1) != _hash_pesos(pesos_2)
+def test_trava_ida_e_volta(tmp_path):
+    alvo = str(tmp_path / "t.json")
+    pesos = {str(i): float(i) for i in range(1, 26)}
+    integridade.gravar_trava(pesos, alvo)
+    lidos, ok = integridade.carregar_pesos_para_engine(alvo)
+    assert ok is True and lidos == pesos
 
-def test_carregar_pesos_fallback_sem_arquivo(tmp_path, monkeypatch):
-    """Garante fallback para PESOS_PADRAO se o arquivo de trava não existir."""
-    falso_json = tmp_path / "pesos_inexistentes.json"
-    monkeypatch.setattr("integridade.ARQUIVO_TRAVA", str(falso_json))
-    
-    pesos_carregados, ativo = carregar_pesos_para_engine()
-    assert pesos_carregados == PESOS_PADRAO
-    assert ativo is False
 
-def test_violacao_de_hash_na_trava(tmp_path, monkeypatch):
-    """Verifica se o sistema rejeita pesos cuja hash não bate com o registro da trava."""
-    falso_json = tmp_path / "pesos_adulterados.json"
-    dados_adulterados = {
-        "pesos": {"soma": 1.5},
-        "hash_pesos": "hash_falsa_invalida_1234567890abcdef",
-        "data_trava": "2026-01-01T00:00:00",
-        "dias_validade": 90
-    }
-    falso_json.write_text(json.dumps(dados_adulterados))
-    monkeypatch.setattr("integridade.ARQUIVO_TRAVA", str(falso_json))
-    
-    pesos_carregados, ativo = carregar_pesos_para_engine()
-    # Deve rejeitar e cair no padrão
-    assert pesos_carregados == PESOS_PADRAO
-    assert ativo is False
+def test_json_sem_chave_pesos_nao_e_valido(tmp_path):
+    alvo = tmp_path / "t.json"
+    alvo.write_text(json.dumps({"qualquer": "coisa"}))
+    lidos, ok = integridade.carregar_pesos_para_engine(str(alvo))
+    assert ok is False and lidos == PESOS_PADRAO
+
+
+def test_trava_adulterada_cai_no_padrao(tmp_path):
+    alvo = tmp_path / "t.json"
+    integridade.gravar_trava({str(i): 2.0 for i in range(1, 26)}, str(alvo))
+    dados = json.loads(alvo.read_text())
+    dados["pesos"]["1"] = 99.0
+    alvo.write_text(json.dumps(dados))
+    lidos, ok = integridade.carregar_pesos_para_engine(str(alvo))
+    assert ok is False and lidos == PESOS_PADRAO
+
+
+def test_json_quebrado_cai_no_padrao(tmp_path):
+    alvo = tmp_path / "t.json"
+    alvo.write_text("nao e json")
+    lidos, ok = integridade.carregar_pesos_para_engine(str(alvo))
+    assert ok is False and lidos == PESOS_PADRAO
+
+
+def test_comprovantes_sem_duplicar(tmp_path):
+    alvo = str(tmp_path / "c.csv")
+    bilhetes = [list(range(1, 16)), list(range(11, 26))]
+    assert integridade.registrar_comprovantes(3800, bilhetes, alvo) == (2, 0)
+    assert integridade.registrar_comprovantes(3800, bilhetes, alvo) == (0, 2)
+    linhas = integridade._ler_comprovantes(alvo)
+    assert len(linhas) == 2 and linhas[0]["concurso"] == "3800"
