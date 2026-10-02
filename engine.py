@@ -1,5 +1,5 @@
 import math
-import random
+import secrets  # <--- ALTERAÇÃO 1: Importamos entropia do SO (criptográfica)
 from collections import Counter
 from typing import Dict, List, Optional, Sequence
 
@@ -11,7 +11,8 @@ QUANTIDADE_MAXIMA = 100
 
 AVISO = (
     "Os sorteios da Lotofácil são aleatórios: estes bilhetes não têm mais chance "
-    "de acertar do que quaisquer outros de 15 dezenas."
+    "de acertar do que quaisquer outros de 15 dezenas. "
+    "[GERAÇÃO DE ENTROPIA CRIPTOGRÁFICA ATIVADA]" # <--- ALTERAÇÃO 2: Aviso atualizado
 )
 
 
@@ -35,8 +36,11 @@ def _pesos_por_dezena(pesos: Dict) -> List[float]:
     return lista
 
 
-def sortear_bilhete(pesos_lista: Sequence[float], rng=random) -> List[int]:
+def sortear_bilhete(pesos_lista: Sequence[float], rng=None) -> List[int]:
     """Sorteia 15 dezenas distintas, com probabilidade proporcional aos pesos."""
+    # <--- ALTERAÇÃO 3: Inicialização quântica/criptográfica caso não venha de laboratório (testes)
+    rng = rng or secrets.SystemRandom()
+
     # Com menos de 15 pesos positivos não dá para montar um bilhete ponderado
     # (random.choices levantaria erro no meio do sorteio): cai no sorteio simples.
     if sum(1 for p in pesos_lista if p > 0) < TAMANHO_BILHETE:
@@ -89,7 +93,9 @@ def gerar_jogos_genetico(quantidade=10, concurso=None, caminho_pesos=None, pesos
     """
     if not isinstance(quantidade, int) or not (1 <= quantidade <= QUANTIDADE_MAXIMA):
         raise ValueError(f"quantidade deve ser um inteiro entre 1 e {QUANTIDADE_MAXIMA}.")
-    rng = rng or random
+    
+    # <--- ALTERAÇÃO 4: Aplicação da segurança criptográfica em nível superior
+    rng = rng or secrets.SystemRandom()
 
     if pesos is not None:
         pesos_dict, valido = pesos, False  # pesos avulsos não passam pela trava

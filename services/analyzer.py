@@ -12,7 +12,7 @@ antes de tratar esses pesos como algo além de uma forma de variar os bilhetes.
 
 import itertools
 import math
-import random
+import secrets  # <--- ALTERAÇÃO 1: Substitui import random
 import statistics
 from collections import Counter
 from typing import Dict, List, Optional
@@ -123,7 +123,9 @@ def generate_tickets(config: dict, stats: dict, rng=None) -> List[dict]:
     Pode devolver menos bilhetes que o pedido se o filtro de soma for muito restritivo:
     confira len(resultado).
     """
-    rng = rng or random
+    # <--- ALTERAÇÃO 2: Sistema protegido com secrets
+    rng = rng or secrets.SystemRandom()
+    
     total = int(config.get("total_numbers", 15))
     faixa = int(config.get("number_range", 25))
     fixos = sorted(set(int(n) for n in config.get("fixed_numbers", [])))

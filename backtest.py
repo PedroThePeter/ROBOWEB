@@ -109,20 +109,22 @@ def veredito(inferior: float, superior: float) -> str:
 # ----------------------------------------------------------------------
 # Execução
 # ----------------------------------------------------------------------
-def rodar_baseline(sorteios: List[List[int]], alvos: List[int]) -> Dict[int, dict]:
+def rodar_baseline(sorteios: List[List[int]], alvos: List[int], rng: random.Random) -> Dict[int, dict]:
     saida = {}
     for idx in alvos:
-        bilhetes = [sorted(random.sample(range(1, 26), 15)) for _ in range(BILHETES_BASELINE)]
+        # <--- ALTERAÇÃO 1: Baseline respeita a reprodutibilidade do RNG
+        bilhetes = [sorted(rng.sample(range(1, 26), 15)) for _ in range(BILHETES_BASELINE)]
         saida[idx] = metricas_bilhetes(bilhetes, set(sorteios[idx]))
     return saida
 
 
-def rodar_engine(sorteios: List[List[int]], alvos: List[int], n_bilhetes: int, janela: int) -> Dict[int, dict]:
+def rodar_engine(sorteios: List[List[int]], alvos: List[int], n_bilhetes: int, janela: int, rng: random.Random) -> Dict[int, dict]:
     saida = {}
     inicio = time.time()
     for k, idx in enumerate(alvos, 1):
         pesos = engine.pesos_por_frequencia(sorteios[:idx], janela or None)  # só o passado
-        resultado = engine.gerar_jogos_genetico(quantidade=n_bilhetes, pesos=pesos)
+        # <--- ALTERAÇÃO 2: Passamos o RNG com seed para forçar a engine a agir como laboratório
+        resultado = engine.gerar_jogos_genetico(quantidade=n_bilhetes, pesos=pesos, rng=rng)
         saida[idx] = metricas_bilhetes(resultado["bilhetes"], set(sorteios[idx]))
         if k % 50 == 0:
             print(f"   [engine] {k}/{len(alvos)} rodadas ({time.time() - inicio:.0f}s)")
@@ -158,7 +160,7 @@ def imprimir_resultado_principal(eng: Dict[int, dict], base: Dict[int, dict]):
             print(f"  {n} acertos: {qtd}x")
 
 
-def rodar_backtest(caminho: str, inicio: int, passo: int, n_bilhetes: int, janela: int) -> None:
+def rodar_backtest(caminho: str, inicio: int, passo: int, n_bilhetes: int, janela: int, semente: int = None) -> None:
     sorteios = carregar_sorteios(caminho)
     total = len(sorteios)
 
@@ -166,12 +168,15 @@ def rodar_backtest(caminho: str, inicio: int, passo: int, n_bilhetes: int, janel
         print(f"A base tem só {total} concursos válidos; --inicio ({inicio}) é maior que isso.")
         sys.exit(1)
 
+    # <--- ALTERAÇÃO 3: Criamos um RNG dedicado para o escopo do backtest
+    rng = random.Random(semente)
+
     alvos = list(range(inicio, total, passo))
     print(f"Base: {total} concursos válidos | {len(alvos)} rodadas | {n_bilhetes} bilhetes por rodada | janela {janela or 'toda a base'}")
     print(f"Sorteio teórico: média {media_teorica():.3f} acertos, {taxa_premio_teorica() * 100:.2f}% dos bilhetes com 11+")
 
-    base = rodar_baseline(sorteios, alvos)
-    eng = rodar_engine(sorteios, alvos, n_bilhetes, janela)
+    base = rodar_baseline(sorteios, alvos, rng)
+    eng = rodar_engine(sorteios, alvos, n_bilhetes, janela, rng)
     imprimir_resultado_principal(eng, base)
 
 
@@ -185,7 +190,5 @@ if __name__ == "__main__":
     parser.add_argument("--semente", type=int, default=None, help="Semente aleatória para resultado reproduzível")
     args = parser.parse_args()
 
-    if args.semente is not None:
-        random.seed(args.semente)
-
-    rodar_backtest(args.planilha, args.inicio, args.passo, args.bilhetes, args.janela)
+    # Passamos a semente explicitamente para a função
+    rodar_backtest(args.planilha, args.inicio, args.passo, args.bilhetes, args.janela, args.semente)
