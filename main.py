@@ -59,6 +59,7 @@ async def custom_404_handler(request: Request, exc: Exception):
 class RequisicaoGerarJogos(BaseModel):
     concurso: Optional[int] = None
     quantidade: Optional[int] = 10
+    temperatura: Optional[float] = 0.0  # NOVA VARIÁVEL QUÂNTICA/TERMODINÂMICA
 
 
 class RequisicaoRotinaDiaria(BaseModel):
@@ -305,11 +306,12 @@ def api_recarregar_base():
 @app.post("/api/lapidacao")
 @app.post("/api/lapidacao/")
 def api_gerar_jogos(req: Optional[RequisicaoGerarJogos] = None):
-    """Gera bilhetes pelos pesos ativos e registra no diário."""
+    """Gera bilhetes pelos pesos ativos (modulados pela temperatura) e registra no diário."""
     qtd = _quantidade_segura(req.quantidade if req else None)
     concurso = req.concurso if req else None
+    temperatura = req.temperatura if req else 0.0 # Aplicação da Temperatura
     try:
-        resultado = engine.gerar_jogos_genetico(quantidade=qtd, concurso=concurso)
+        resultado = engine.gerar_jogos_genetico(quantidade=qtd, concurso=concurso, temperatura=temperatura)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

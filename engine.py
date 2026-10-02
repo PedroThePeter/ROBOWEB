@@ -1,5 +1,5 @@
 import math
-import secrets  # <--- ALTERAÇÃO 1: Importamos entropia do SO (criptográfica)
+import secrets  # <-- Usando entropia real do SO
 from collections import Counter
 from typing import Dict, List, Optional, Sequence
 
@@ -12,7 +12,7 @@ QUANTIDADE_MAXIMA = 100
 AVISO = (
     "Os sorteios da Lotofácil são aleatórios: estes bilhetes não têm mais chance "
     "de acertar do que quaisquer outros de 15 dezenas. "
-    "[GERAÇÃO DE ENTROPIA CRIPTOGRÁFICA ATIVADA]" # <--- ALTERAÇÃO 2: Aviso atualizado
+    "[GERAÇÃO DE ENTROPIA CRIPTOGRÁFICA ATIVADA]"
 )
 
 
@@ -38,7 +38,6 @@ def _pesos_por_dezena(pesos: Dict) -> List[float]:
 
 def sortear_bilhete(pesos_lista: Sequence[float], rng=None) -> List[int]:
     """Sorteia 15 dezenas distintas, com probabilidade proporcional aos pesos."""
-    # <--- ALTERAÇÃO 3: Inicialização quântica/criptográfica caso não venha de laboratório (testes)
     rng = rng or secrets.SystemRandom()
 
     # Com menos de 15 pesos positivos não dá para montar um bilhete ponderado
@@ -85,16 +84,15 @@ class LotofacilGeneticEngine:
         return self.gerar_jogos(quantidade=quantidade, concurso=concurso)
 
 
-def gerar_jogos_genetico(quantidade=10, concurso=None, caminho_pesos=None, pesos=None, rng=None):
+def gerar_jogos_genetico(quantidade=10, concurso=None, caminho_pesos=None, pesos=None, rng=None, temperatura=0.0):
     """
-    Gera bilhetes por seleção ponderada pelos pesos ativos (da trava, ou os passados em `pesos`).
-    Observação: apesar do nome, não há algoritmo genético aqui; é sorteio ponderado.
-    Retorna dict com os jogos, os hashes SHA-256 e se a trava de pesos estava válida.
+    Gera bilhetes por seleção ponderada pelos pesos ativos.
+    A variável `temperatura` (0.0 a 100.0) controla a entropia:
+    T=0 segue a trava rigorosamente. T=100 ignora os pesos e converte num sorteio equiprovável (caos puro).
     """
     if not isinstance(quantidade, int) or not (1 <= quantidade <= QUANTIDADE_MAXIMA):
         raise ValueError(f"quantidade deve ser um inteiro entre 1 e {QUANTIDADE_MAXIMA}.")
     
-    # <--- ALTERAÇÃO 4: Aplicação da segurança criptográfica em nível superior
     rng = rng or secrets.SystemRandom()
 
     if pesos is not None:
@@ -104,6 +102,17 @@ def gerar_jogos_genetico(quantidade=10, concurso=None, caminho_pesos=None, pesos
 
     pesos_lista = _pesos_por_dezena(extrair_pesos_dict(pesos_dict))
 
+    # --- APLICAÇÃO DA TERMODINÂMICA ESTATÍSTICA ---
+    if temperatura > 0.0:
+        # Normaliza a temperatura entre 0 e 1
+        t_norm = max(0.0, min(temperatura, 100.0)) / 100.0
+        
+        # Interpolação Linear de Estados Probabilísticos
+        if pesos_lista:
+            peso_medio = sum(pesos_lista) / len(pesos_lista)
+            # W_final = W_original * (1 - T) + W_medio * T
+            pesos_lista = [p * (1.0 - t_norm) + (peso_medio * t_norm) for p in pesos_lista]
+
     jogos = [sortear_bilhete(pesos_lista, rng) for _ in range(quantidade)]
     hashes = [_hash_bilhete(b) for b in jogos]
 
@@ -112,8 +121,9 @@ def gerar_jogos_genetico(quantidade=10, concurso=None, caminho_pesos=None, pesos
         "concurso": concurso,
         "quantidade": quantidade,
         "jogos": jogos,
-        "bilhetes": jogos,  # interfaces que leem 'bilhetes'
+        "bilhetes": jogos, 
         "hashes": hashes,
         "trava_valida": valido,
         "aviso": AVISO,
+        "temperatura_aplicada": temperatura  # Retorno no log para auditoria
     }

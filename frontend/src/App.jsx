@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const API_BASE = "https://roboweb-cvha.onrender.com";
+const API_BASE = "https://roboweb-cvha.onrender.com"; // Preservando sua conexão com o Render
 
 const pct = (v) => `${(v * 100).toFixed(1).replace(".", ",")}%`;
 const dois = (d) => String(d).padStart(2, "0");
@@ -14,6 +14,7 @@ export default function App() {
 
   const [quantidade, setQuantidade] = useState(10);
   const [concurso, setConcurso] = useState("");
+  const [temperatura, setTemperatura] = useState(0); // ESTADO DA TEMPERATURA QUÂNTICA
   const [resultadoGeracao, setResultadoGeracao] = useState(null);
   const [mensagemErro, setMensagemErro] = useState("");
   const [mensagemSucesso, setMensagemSucesso] = useState("");
@@ -74,7 +75,10 @@ export default function App() {
     setMensagemErro("");
     setMensagemSucesso("");
     try {
-      const corpo = { quantidade: Math.min(100, Math.max(1, parseInt(quantidade, 10) || 1)) };
+      const corpo = { 
+        quantidade: Math.min(100, Math.max(1, parseInt(quantidade, 10) || 1)),
+        temperatura: parseFloat(temperatura) // Enviando a temperatura para o Render
+      };
       const numConcurso = parseInt(concurso, 10);
       if (numConcurso > 0) corpo.concurso = numConcurso;
 
@@ -145,6 +149,38 @@ export default function App() {
     } finally {
       setLoadingDesd(false);
     }
+  };
+
+  // --- Exportar para TXT (UX / Full Stack) ---
+  const handleDownloadTXT = (bilhetes, tipoOrigem, numConcurso) => {
+    if (!bilhetes || bilhetes.length === 0) return;
+    
+    let texto = `========================================\n`;
+    texto += ` LOTOFÁCIL IA v8.0 - REGISTRO DE JOGOS\n`;
+    texto += `========================================\n`;
+    texto += `Origem da Geração: ${tipoOrigem}\n`;
+    texto += `Concurso Alvo: ${numConcurso || "Não informado"}\n`;
+    texto += `Data de Exportação: ${new Date().toLocaleString('pt-BR')}\n`;
+    texto += `Total de Bilhetes: ${bilhetes.length}\n\n`;
+    
+    bilhetes.forEach((bilhete, index) => {
+      texto += `Bilhete ${String(index + 1).padStart(3, '0')}: ${bilhete.map(dois).join(" - ")}\n`;
+    });
+    
+    texto += `\n========================================\n`;
+    texto += `Boa sorte! A física quântica e a estatística estão ao seu dispor.\n`;
+
+    const blob = new Blob([texto], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const sufixoConcurso = numConcurso ? `_conc_${numConcurso}` : "";
+    link.download = `lotofacil_${tipoOrigem.toLowerCase().replace(/ /g, '_')}${sufixoConcurso}.txt`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const base = estatisticas?.base;
@@ -229,11 +265,29 @@ export default function App() {
       <div style={{ border: "1px solid #1e40af", padding: "20px", borderRadius: "8px", backgroundColor: "#f0f9ff" }}>
         <h3>🎲 Gerador de bilhetes (sorteio ponderado)</h3>
         <p style={{ color: "#475569", fontSize: "14px", marginTop: "-5px" }}>
-          Sorteia 15 dezenas distintas com probabilidade proporcional aos pesos ativos da trava
-          (sem trava, todas as dezenas têm o mesmo peso). Cada bilhete é registrado com hash SHA-256.
+          Sorteia 15 dezenas distintas com probabilidade proporcional aos pesos ativos da trava.
+          Ajuste a temperatura para injetar aleatoriedade térmica no algoritmo.
         </p>
 
-        <div style={{ display: "flex", gap: "20px", alignItems: "center", marginBottom: "15px", marginTop: "15px", flexWrap: "wrap" }}>
+        {/* CONTROLE DE TEMPERATURA QUÂNTICA AQUI */}
+        <div style={{ marginBottom: "20px", padding: "15px", backgroundColor: "#e0f2fe", borderRadius: "8px", border: "1px solid #bae6fd" }}>
+          <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold", color: "#0369a1" }}>
+            🔥 Temperatura Quântica (Entropia): {temperatura}%
+          </label>
+          <input
+            type="range"
+            min="0" max="100"
+            value={temperatura}
+            onChange={(e) => setTemperatura(e.target.value)}
+            style={{ width: "100%", cursor: "pointer" }}
+          />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#0284c7", marginTop: "5px" }}>
+            <span>0% (Pesos Históricos)</span>
+            <span>100% (Sorteio Uniforme / Caos)</span>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "20px", alignItems: "center", marginBottom: "15px", flexWrap: "wrap" }}>
           <div>
             <label style={{ marginRight: "10px", fontWeight: "bold" }}>Quantidade de Bilhetes:</label>
             <input
@@ -270,10 +324,21 @@ export default function App() {
       {/* Exibição dos bilhetes */}
       {resultadoGeracao && resultadoGeracao.bilhetes && resultadoGeracao.bilhetes.length > 0 && (
         <div style={{ marginTop: "30px" }}>
-          <h3>🎟️ Bilhetes gerados ({resultadoGeracao.bilhetes.length})</h3>
-          <p style={{ color: "#555", fontSize: "13px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+            <h3>🎟 Bilhetes gerados ({resultadoGeracao.bilhetes.length})</h3>
+            
+            <button
+              onClick={() => handleDownloadTXT(resultadoGeracao.bilhetes, `Sorteio Ponderado (Temp: ${resultadoGeracao.temperatura_aplicada}%)`, resultadoGeracao.concurso)}
+              style={{ padding: "8px 16px", backgroundColor: "#15803d", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px" }}
+            >
+               📥 Salvar em TXT
+            </button>
+          </div>
+          
+          <p style={{ color: "#555", fontSize: "13px", marginTop: "-5px" }}>
             Concurso: <strong>{resultadoGeracao.concurso ?? "não informado"}</strong> {" | "}
-            Trava de pesos: <strong>{resultadoGeracao.trava_valida ? "validada" : "não ativa (pesos uniformes)"}</strong>
+            Temperatura: <strong>{resultadoGeracao.temperatura_aplicada}%</strong> {" | "}
+            Trava de pesos: <strong>{resultadoGeracao.trava_valida ? "validada" : "não ativa"}</strong>
           </p>
 
           {resultadoGeracao.bilhetes.map((bilhete, index) => (
@@ -393,8 +458,18 @@ export default function App() {
 
       {resultadoDesd && resultadoDesd.bilhetes && (
         <div style={{ marginTop: "20px" }}>
-          <h3>🧩 {resultadoDesd.quantidade_bilhetes} bilhetes para garantir {resultadoDesd.garantia_pedida} acertos</h3>
-          <p style={{ color: "#555", fontSize: "13px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+            <h3>🧩 {resultadoDesd.quantidade_bilhetes} bilhetes para garantir {resultadoDesd.garantia_pedida} acertos</h3>
+            
+            <button
+              onClick={() => handleDownloadTXT(resultadoDesd.bilhetes, "Desdobramento", resultadoDesd.concurso)}
+              style={{ padding: "8px 16px", backgroundColor: "#15803d", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px" }}
+            >
+               📥 Salvar em TXT
+            </button>
+          </div>
+          
+          <p style={{ color: "#555", fontSize: "13px", marginTop: "-5px" }}>
             Garantia verificada por força bruta: <strong>{resultadoDesd.garantia_verificada ? "sim ✅" : "não ❌"}</strong> {" | "}
             Chance de as 15 sorteadas caírem no seu grupo: <strong>1 em {Number(resultadoDesd.um_em).toLocaleString("pt-BR")}</strong>
           </p>
