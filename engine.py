@@ -1,5 +1,5 @@
 import math
-import secrets  # <-- Usando entropia real do SO
+import secrets
 from collections import Counter
 from typing import Dict, List, Optional, Sequence
 
@@ -12,19 +12,17 @@ QUANTIDADE_MAXIMA = 100
 AVISO = (
     "Os sorteios da Lotofácil são aleatórios: estes bilhetes não têm mais chance "
     "de acertar do que quaisquer outros de 15 dezenas. "
-    "[GERAÇÃO DE ENTROPIA CRIPTOGRÁFICA ATIVADA]"
+    "[ESPECTRO TÉRMICO AUTOMÁTICO ATIVADO]"
 )
 
 
 def extrair_pesos_dict(pesos_input):
-    """Garante o dicionário de pesos, mesmo que venha como tupla (pesos, valido)."""
     if isinstance(pesos_input, tuple):
         return pesos_input[0]
     return pesos_input
 
 
 def _pesos_por_dezena(pesos: Dict) -> List[float]:
-    """Lista de 25 pesos (dezenas 1..25). Valor inválido, negativo ou infinito vira 0."""
     lista = []
     for d in DEZENAS:
         bruto = pesos.get(str(d), pesos.get(d, 1.0))
@@ -37,11 +35,7 @@ def _pesos_por_dezena(pesos: Dict) -> List[float]:
 
 
 def sortear_bilhete(pesos_lista: Sequence[float], rng=None) -> List[int]:
-    """Sorteia 15 dezenas distintas, com probabilidade proporcional aos pesos."""
     rng = rng or secrets.SystemRandom()
-
-    # Com menos de 15 pesos positivos não dá para montar um bilhete ponderado
-    # (random.choices levantaria erro no meio do sorteio): cai no sorteio simples.
     if sum(1 for p in pesos_lista if p > 0) < TAMANHO_BILHETE:
         return sorted(rng.sample(DEZENAS, TAMANHO_BILHETE))
 
@@ -56,61 +50,45 @@ def sortear_bilhete(pesos_lista: Sequence[float], rng=None) -> List[int]:
 
 
 def pesos_por_frequencia(sorteios: Sequence[Sequence[int]], janela: Optional[int] = None) -> Dict[str, float]:
-    """
-    Peso de cada dezena = vezes que saiu nos últimos `janela` concursos (+1 de suavização).
-    Sem histórico, todos os pesos valem 1.0. Use no backtest ou para montar uma trava
-    (integridade.gravar_trava). Atenção: o backtest mostra se isso supera o acaso.
-    """
     recentes = sorteios[-janela:] if janela else sorteios
     cont = Counter(d for s in recentes for d in s)
     return {str(d): float(cont.get(d, 0) + 1) for d in DEZENAS}
 
 
 class LotofacilGeneticEngine:
-    """Wrapper de compatibilidade para módulos que instanciam o motor."""
-
     def __init__(self, caminho_pesos=None):
         self.caminho_pesos = caminho_pesos
 
-    def gerar_jogos(self, quantidade=10, concurso=None, pesos=None):
+    def gerar_jogos(self, quantidade=1, concurso=None, pesos=None, temperatura=0.0):
         return gerar_jogos_genetico(
             quantidade=quantidade,
             concurso=concurso,
             caminho_pesos=self.caminho_pesos,
             pesos=pesos,
+            temperatura=temperatura,
         )
 
-    def executar(self, quantidade=10, concurso=None):
+    def executar(self, quantidade=1, concurso=None):
         return self.gerar_jogos(quantidade=quantidade, concurso=concurso)
 
 
-def gerar_jogos_genetico(quantidade=10, concurso=None, caminho_pesos=None, pesos=None, rng=None, temperatura=0.0):
-    """
-    Gera bilhetes por seleção ponderada pelos pesos ativos.
-    A variável `temperatura` (0.0 a 100.0) controla a entropia:
-    T=0 segue a trava rigorosamente. T=100 ignora os pesos e converte num sorteio equiprovável (caos puro).
-    """
+def gerar_jogos_genetico(quantidade=1, concurso=None, caminho_pesos=None, pesos=None, rng=None, temperatura=0.0):
     if not isinstance(quantidade, int) or not (1 <= quantidade <= QUANTIDADE_MAXIMA):
         raise ValueError(f"quantidade deve ser um inteiro entre 1 e {QUANTIDADE_MAXIMA}.")
     
     rng = rng or secrets.SystemRandom()
 
     if pesos is not None:
-        pesos_dict, valido = pesos, False  # pesos avulsos não passam pela trava
+        pesos_dict, valido = pesos, False
     else:
         pesos_dict, valido = carregar_pesos_para_engine(caminho_pesos)
 
     pesos_lista = _pesos_por_dezena(extrair_pesos_dict(pesos_dict))
 
-    # --- APLICAÇÃO DA TERMODINÂMICA ESTATÍSTICA ---
     if temperatura > 0.0:
-        # Normaliza a temperatura entre 0 e 1
         t_norm = max(0.0, min(temperatura, 100.0)) / 100.0
-        
-        # Interpolação Linear de Estados Probabilísticos
         if pesos_lista:
             peso_medio = sum(pesos_lista) / len(pesos_lista)
-            # W_final = W_original * (1 - T) + W_medio * T
             pesos_lista = [p * (1.0 - t_norm) + (peso_medio * t_norm) for p in pesos_lista]
 
     jogos = [sortear_bilhete(pesos_lista, rng) for _ in range(quantidade)]
@@ -121,9 +99,9 @@ def gerar_jogos_genetico(quantidade=10, concurso=None, caminho_pesos=None, pesos
         "concurso": concurso,
         "quantidade": quantidade,
         "jogos": jogos,
-        "bilhetes": jogos, 
+        "bilhetes": jogos,
         "hashes": hashes,
         "trava_valida": valido,
         "aviso": AVISO,
-        "temperatura_aplicada": temperatura  # Retorno no log para auditoria
+        "temperatura_aplicada": temperatura
     }

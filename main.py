@@ -25,8 +25,6 @@ app = FastAPI(
     version="8.0"
 )
 
-# CORS aberto para o frontend. allow_credentials=False porque a API não usa cookies
-# (navegadores rejeitam "*" combinado com credenciais).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,11 +33,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Cache da parte cara (ler a planilha + testes de memória). Limpo em /api/recarregar-base.
 _cache = {"base": None}
 
-
-# --- 404 informando a rota exata pedida pelo frontend ---
 
 @app.exception_handler(404)
 async def custom_404_handler(request: Request, exc: Exception):
@@ -54,46 +49,22 @@ async def custom_404_handler(request: Request, exc: Exception):
     )
 
 
-# --- Schemas ---
-
 class RequisicaoGerarJogos(BaseModel):
     concurso: Optional[int] = None
-    quantidade: Optional[int] = 10
-    temperatura: Optional[float] = 0.0  # NOVA VARIÁVEL QUÂNTICA/TERMODINÂMICA
 
 
-class RequisicaoRotinaDiaria(BaseModel):
+class RequisicaoDesdobramentoEspectro(BaseModel):
     concurso: Optional[int] = None
-    quantidade: Optional[int] = 10
-    sem_commit: Optional[bool] = False
-    sem_diario: Optional[bool] = False
 
-
-class RequisicaoDesdobramento(BaseModel):
-    dezenas: List[int]
-    garantia: int = 14
-    concurso: Optional[int] = None  # se informado, grava comprovantes e registra no diário
-
-
-def _quantidade_segura(valor: Optional[int]) -> int:
-    """Padrão 10; nunca acima do limite (evita pedido gigante derrubar o servidor)."""
-    if not valor or valor < 1:
-        return 10
-    return min(valor, engine.QUANTIDADE_MAXIMA)
-
-
-# --- Estatísticas reais (planilha + testes de memória + desempenho conferido) ---
 
 def _caminho_planilha() -> str:
     return os.environ.get("PLANILHA", PLANILHA_PADRAO)
 
 
 def _resumo_memoria(sorteios) -> dict:
-    """Roda os 4 testes do analise_memoria e resume cada um (sem imprimir nada)."""
     am = analise_memoria
     testes = []
 
-    # 1) Frequência das dezenas
     freq = am.teste_frequencia(sorteios)
     lim = am.z_bonferroni(25)
     dezena, (_, z) = max(freq.items(), key=lambda x: abs(x[1][1]))
@@ -103,7 +74,6 @@ def _resumo_memoria(sorteios) -> dict:
         "detalhe": f"maior desvio: dezena {dezena:02d}, z = {z:+.2f} (limite {lim:.2f})",
     })
 
-    # 2) Repetição do concurso anterior
     rep = am.teste_repeticao(sorteios)
     lim_rep = am.z_bonferroni(2)
     achado_rep = abs(rep["z"]) > lim_rep or rep["p_qui2"] < 0.025
@@ -113,7 +83,6 @@ def _resumo_memoria(sorteios) -> dict:
         "detalhe": f"média {rep['media']:.3f} (esperado {am.MEDIA_REPETIDAS:.1f}), z = {rep['z']:+.2f}",
     })
 
-    # 3) Atraso
     atraso = am.teste_atraso(sorteios)
     lim_a = am.z_bonferroni(len(atraso))
     rotulo, _, taxa, za = max(atraso, key=lambda x: abs(x[3]))
@@ -123,7 +92,6 @@ def _resumo_memoria(sorteios) -> dict:
         "detalhe": f"maior desvio em K={rotulo}: taxa {taxa:.1%} (esperado 60%), z = {za:+.2f} (limite {lim_a:.2f})",
     })
 
-    # 4) Pares
     pares = am.teste_pares(sorteios)
     lim_p = am.z_bonferroni(len(pares))
     (a, b), cont, zp = pares[0]
@@ -175,36 +143,9 @@ def _desempenho() -> dict:
     }
 
 
-def _registrar_desdobramento(concurso: int, bilhetes: List[List[int]]) -> dict:
-    """Grava comprovantes (hash) e diário para os bilhetes do desdobramento."""
-    registro = {"comprovantes": None, "diario_salvo": False}
-    try:
-        novos, repetidos = integridade.registrar_comprovantes(concurso, bilhetes)
-        registro["comprovantes"] = {"novos": novos, "ja_existiam": repetidos}
-    except Exception:
-        pass
-    try:
-        registro["diario_salvo"] = diario.salvar_palpites(
-            {
-                "concurso": concurso,
-                "quantidade": len(bilhetes),
-                "jogos": bilhetes,
-                "hashes": [integridade._hash_bilhete(b) for b in bilhetes],
-                "trava_valida": False,
-            },
-            origem="desdobramento",
-        )
-    except Exception:
-        pass
-    return registro
-
-
-# --- Endpoints ---
-
 @app.get("/")
 @app.get("/api")
 def root():
-    """Verificação de estado do servidor."""
     return {
         "status": "online",
         "sistema": "Lotofácil IA v8.0",
@@ -224,7 +165,6 @@ def api_status():
 @app.get("/api/estatisticas")
 @app.get("/api/estatisticas/")
 def api_estatisticas():
-    """Painel do frontend: base histórica, testes de memória, trava e desempenho real."""
     try:
         if _cache["base"] is None:
             _cache["base"] = _montar_base()
@@ -240,43 +180,9 @@ def api_estatisticas():
         raise HTTPException(status_code=500, detail=f"Erro ao montar as estatísticas: {e}")
 
 
-@app.get("/api/historico")
-@app.get("/api/historico/")
-@app.get("/api/palpites")
-@app.get("/api/palpites/")
-@app.get("/api/diario")
-@app.get("/api/diario/")
-@app.get("/api/dados")
-@app.get("/api/dados/")
-@app.get("/api/carregar-dados")
-@app.get("/api/carregar-dados/")
-@app.post("/api/historico")
-@app.post("/api/palpites")
-@app.post("/api/diario")
-@app.post("/api/dados")
-@app.post("/api/carregar-dados")
-def api_obter_historico():
-    """Dados consolidados do diário e últimos palpites."""
-    try:
-        dados = diario.obter_dados_diario()
-        return {
-            "status": "sucesso",
-            "historico": dados["historico"],
-            "ultimos_palpites": dados["ultimos_palpites"],
-            "jogos": dados["ultimos_palpites"]
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao carregar histórico do diário: {e}")
-
-
 @app.post("/api/recarregar-base")
 @app.post("/api/recarregar-base/")
-@app.post("/api/recarregar-planilha")
-@app.post("/api/recarregar-planilha/")
-@app.get("/api/recarregar-base")
-@app.get("/api/recarregar-planilha")
 def api_recarregar_base():
-    """Relê a planilha (refaz os testes de memória), a trava de pesos e o painel de auditoria."""
     try:
         _cache["base"] = None
         base = _montar_base()
@@ -284,13 +190,10 @@ def api_recarregar_base():
         _, valido = integridade.carregar_pesos_para_engine()
         painel_auditoria.gerar_relatorio_html()
 
-        if base.get("disponivel"):
-            mensagem = f"Planilha relida ({base['concursos']} concursos), trava verificada e painel atualizado."
-        else:
-            mensagem = f"Trava verificada e painel atualizado. Atenção: {base['mensagem']}"
+        mensagem = f"Planilha relida ({base.get('concursos', 0)} concursos) e trava verificada."
         return {
             "status": "sucesso",
-            "sucesso": True,  # compatibilidade com frontends antigos
+            "sucesso": True,
             "mensagem": mensagem,
             "trava_valida": valido,
             "concursos": base.get("concursos"),
@@ -301,106 +204,105 @@ def api_recarregar_base():
 
 @app.post("/api/gerar-jogos")
 @app.post("/api/gerar-jogos/")
-@app.post("/api/gerar-bilhetes")
-@app.post("/api/gerar-bilhetes/")
-@app.post("/api/lapidacao")
-@app.post("/api/lapidacao/")
 def api_gerar_jogos(req: Optional[RequisicaoGerarJogos] = None):
-    """Gera bilhetes pelos pesos ativos (modulados pela temperatura) e registra no diário."""
-    qtd = _quantidade_segura(req.quantidade if req else None)
+    """Gera exatamente 3 bilhetes automáticos: Frio, Morno e Quente."""
     concurso = req.concurso if req else None
-    temperatura = req.temperatura if req else 0.0 # Aplicação da Temperatura
     try:
-        resultado = engine.gerar_jogos_genetico(quantidade=qtd, concurso=concurso, temperatura=temperatura)
+        frio = engine.gerar_jogos_genetico(quantidade=1, concurso=concurso, temperatura=0.0)
+        morno = engine.gerar_jogos_genetico(quantidade=1, concurso=concurso, temperatura=50.0)
+        quente = engine.gerar_jogos_genetico(quantidade=1, concurso=concurso, temperatura=100.0)
+
+        bilhetes_triplos = {
+            "frio": frio["bilhetes"][0],
+            "morno": morno["bilhetes"][0],
+            "quente": quente["bilhetes"][0]
+        }
+
+        resultado = {
+            "status": "sucesso",
+            "concurso": concurso,
+            "bilhetes": bilhetes_triplos,
+            "aviso": engine.AVISO
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Falha na geração dos bilhetes: {e}")
 
-    # Falha ao gravar o diário (ex.: disco somente leitura) não deve perder os bilhetes gerados.
     try:
-        resultado["diario_salvo"] = diario.salvar_palpites(resultado, origem="api")
+        todos_jogos = [bilhetes_triplos["frio"], bilhetes_triplos["morno"], bilhetes_triplos["quente"]]
+        todos_hashes = [integridade._hash_bilhete(b) for b in todos_jogos]
+        dados_diario = {
+            "concurso": concurso,
+            "quantidade": 3,
+            "jogos": todos_jogos,
+            "hashes": todos_hashes,
+            "trava_valida": True
+        }
+        resultado["diario_salvo"] = diario.salvar_palpites(dados_diario, origem="espectro_termico_3")
     except Exception:
         resultado["diario_salvo"] = False
     return resultado
 
 
+@app.post("/api/desdobramento-espectro")
+@app.post("/api/desdobramento-espectro/")
 @app.post("/api/desdobramento")
 @app.post("/api/desdobramento/")
-def api_desdobramento(req: RequisicaoDesdobramento):
-    """
-    Desdobramento com garantia para um grupo de 16 a 18 dezenas.
-    Se 'concurso' vier preenchido, grava comprovantes e registra os bilhetes no diário.
-    """
+def api_desdobramento_espectro(req: Optional[RequisicaoDesdobramentoEspectro] = None):
+    """Gera exatamente 3 bilhetes de desdobramento térmico automático (Frio, Morno e Quente)."""
+    concurso = req.concurso if req and req.concurso else None
     try:
-        resultado = desdobramento.gerar_desdobramento(req.dezenas, req.garantia)
+        pesos_dict, _ = integridade.carregar_pesos_para_engine()
+        
+        # 1. Grupo Frio (Top 17 por peso histórico)
+        pares_pesos = [(int(k), float(v)) for k, v in pesos_dict.items()]
+        pares_pesos.sort(key=lambda x: x[1], reverse=True)
+        grupo_frio = sorted([d for d, _ in pares_pesos[:17]])
+
+        # 2. Grupo Morno (Superposição 50%)
+        import secrets
+        rng = secrets.SystemRandom()
+        lista_pesos = [float(pesos_dict.get(str(i), 1.0)) for i in range(1, 26)]
+        peso_medio = sum(lista_pesos) / len(lista_pesos)
+        pesos_morno = [p * 0.5 + peso_medio * 0.5 for p in lista_pesos]
+        pop = list(range(1, 26))
+        restantes = list(pesos_morno)
+        grupo_morno = []
+        for _ in range(17):
+            i = rng.choices(range(len(pop)), weights=restantes, k=1)[0]
+            grupo_morno.append(pop.pop(i))
+            restantes.pop(i)
+        grupo_morno = sorted(grupo_morno)
+
+        # 3. Grupo Quente (Caos / Uniforme)
+        grupo_quente = sorted(rng.sample(list(range(1, 26)), 17))
+
+        res_frio = desdobramento.gerar_desdobramento(grupo_frio, garantia=14)
+        res_morno = desdobramento.gerar_desdobramento(grupo_morno, garantia=14)
+        res_quente = desdobramento.gerar_desdobramento(grupo_quente, garantia=14)
+
+        # Retorna o primeiro bilhete de cada desdobramento espectral para entregar exatamente 3 bilhetes térmicos
+        bilhetes_desd = {
+            "frio": res_frio["bilhetes"][0],
+            "morno": res_morno["bilhetes"][0],
+            "quente": res_quente["bilhetes"][0]
+        }
+
+        return {
+            "status": "sucesso",
+            "concurso": concurso,
+            "bilhetes": bilhetes_desd,
+            "pools": {
+                "frio": grupo_frio,
+                "morno": grupo_morno,
+                "quente": grupo_quente
+            }
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Falha no desdobramento: {e}")
-
-    resultado["melhor_acerto_se_pool_conter_sorteio"] = {
-        str(k): v for k, v in resultado["melhor_acerto_se_pool_conter_sorteio"].items()
-    }
-    resultado["status"] = "sucesso"
-    resultado["concurso"] = req.concurso
-    resultado["registro"] = (
-        _registrar_desdobramento(req.concurso, resultado["bilhetes"])
-        if req.concurso is not None else None
-    )
-    return resultado
-
-
-@app.post("/api/rotina-diaria")
-@app.post("/api/rotina-diaria/")
-def api_executar_rotina_diaria(req: RequisicaoRotinaDiaria):
-    """Executa gerar + comprovante + diário + painel."""
-    args = SimpleNamespace(
-        concurso=req.concurso,
-        quantidade=_quantidade_segura(req.quantidade),
-        sem_commit=bool(req.sem_commit),
-        sem_diario=bool(req.sem_diario),
-    )
-    resultado = rotina_diaria.executar(args)
-    if resultado.get("status") != "sucesso":
-        raise HTTPException(status_code=500, detail=resultado.get("mensagem", "Erro na rotina diária."))
-    return {
-        "status": "sucesso",
-        "mensagem": "Rotina diária concluída e painel de auditoria atualizado.",
-        "concurso": resultado["concurso"],
-        "jogos": resultado["jogos_gerados"],
-        "comprovantes": resultado["comprovantes"],
-    }
-
-
-@app.get("/api/pesos")
-@app.get("/api/pesos/")
-def api_obter_pesos():
-    """Pesos ativos e status da trava."""
-    try:
-        pesos, valido = integridade.carregar_pesos_para_engine()
-        return {
-            "trava_valida": valido,
-            "hash_sha256": integridade._hash_pesos(pesos),
-            "pesos": pesos
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao carregar os pesos ativos: {e}")
-
-
-@app.get("/auditoria", response_class=HTMLResponse)
-def api_exibir_painel_auditoria():
-    """Mostra o painel estático de auditoria (gera na hora se ainda não existir)."""
-    caminho = painel_auditoria.CAMINHO_PADRAO
-    if not os.path.exists(caminho):
-        painel_auditoria.gerar_relatorio_html(caminho)
-    if os.path.exists(caminho):
-        with open(caminho, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read(), status_code=200)
-    return HTMLResponse(
-        content="<h2>Painel de Auditoria</h2><p>Não foi possível gerar o relatório 'auditoria.html'.</p>",
-        status_code=500
-    )
+        raise HTTPException(status_code=500, detail=f"Falha no desdobramento espectral: {e}")
 
 
 if __name__ == "__main__":

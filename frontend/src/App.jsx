@@ -4,7 +4,6 @@ const API_BASE = "https://roboweb-cvha.onrender.com"; // Preservando sua conexã
 
 const pct = (v) => `${(v * 100).toFixed(1).replace(".", ",")}%`;
 const dois = (d) => String(d).padStart(2, "0");
-const TODAS = Array.from({ length: 25 }, (_, i) => i + 1);
 
 export default function App() {
   const [estatisticas, setEstatisticas] = useState(null);
@@ -12,18 +11,13 @@ export default function App() {
   const [loadingGerar, setLoadingGerar] = useState(false);
   const [loadingRecarregar, setLoadingRecarregar] = useState(false);
 
-  const [quantidade, setQuantidade] = useState(10);
   const [concurso, setConcurso] = useState("");
-  const [temperatura, setTemperatura] = useState(0); // ESTADO DA TEMPERATURA QUÂNTICA
   const [resultadoGeracao, setResultadoGeracao] = useState(null);
   const [mensagemErro, setMensagemErro] = useState("");
   const [mensagemSucesso, setMensagemSucesso] = useState("");
 
-  // Desdobramento
-  const [selecionadas, setSelecionadas] = useState([]);
-  const [garantia, setGarantia] = useState(14);
+  // Desdobramento Espectral
   const [concursoDesd, setConcursoDesd] = useState("");
-  const [tamanhoSorteio, setTamanhoSorteio] = useState(17);
   const [loadingDesd, setLoadingDesd] = useState(false);
   const [resultadoDesd, setResultadoDesd] = useState(null);
   const [erroDesd, setErroDesd] = useState("");
@@ -75,10 +69,7 @@ export default function App() {
     setMensagemErro("");
     setMensagemSucesso("");
     try {
-      const corpo = { 
-        quantidade: Math.min(100, Math.max(1, parseInt(quantidade, 10) || 1)),
-        temperatura: parseFloat(temperatura) // Enviando a temperatura para o Render
-      };
+      const corpo = {};
       const numConcurso = parseInt(concurso, 10);
       if (numConcurso > 0) corpo.concurso = numConcurso;
 
@@ -90,11 +81,7 @@ export default function App() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Erro inesperado.");
       setResultadoGeracao(data);
-      setMensagemSucesso(
-        data.diario_salvo
-          ? "Bilhetes gerados e registrados no diário."
-          : "Bilhetes gerados (não consegui gravar no diário)."
-      );
+      setMensagemSucesso("3 bilhetes térmicos gerados automaticamente.");
     } catch (err) {
       setMensagemErro(err.message);
     } finally {
@@ -102,47 +89,22 @@ export default function App() {
     }
   };
 
-  // --- Desdobramento ---
-  const alternarDezena = (d) => {
-    setResultadoDesd(null);
-    setErroDesd("");
-    setSelecionadas((atual) => {
-      if (atual.includes(d)) return atual.filter((x) => x !== d);
-      if (atual.length >= 18) return atual;
-      return [...atual, d].sort((a, b) => a - b);
-    });
-  };
-
-  const sortearGrupo = () => {
-    setResultadoDesd(null);
-    setErroDesd("");
-    const embaralhadas = [...TODAS];
-    for (let i = embaralhadas.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [embaralhadas[i], embaralhadas[j]] = [embaralhadas[j], embaralhadas[i]];
-    }
-    setSelecionadas(embaralhadas.slice(0, tamanhoSorteio).sort((a, b) => a - b));
-  };
-
-  const handleDesdobrar = async () => {
+  const handleDesdobrarEspectro = async () => {
     setLoadingDesd(true);
     setErroDesd("");
     setResultadoDesd(null);
     try {
-      const corpo = { dezenas: selecionadas, garantia: parseInt(garantia, 10) };
+      const corpo = {};
       const numConcurso = parseInt(concursoDesd, 10);
       if (numConcurso > 0) corpo.concurso = numConcurso;
 
-      const response = await fetch(`${API_BASE}/api/desdobramento`, {
+      const response = await fetch(`${API_BASE}/api/desdobramento-espectro`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(corpo)
       });
       const data = await response.json();
-      if (!response.ok) {
-        const detalhe = Array.isArray(data.detail) ? "Dados inválidos." : data.detail;
-        throw new Error(detalhe || "Erro inesperado.");
-      }
+      if (!response.ok) throw new Error(data.detail || "Erro inesperado.");
       setResultadoDesd(data);
     } catch (err) {
       setErroDesd(err.message);
@@ -151,31 +113,29 @@ export default function App() {
     }
   };
 
-  // --- Exportar para TXT (UX / Full Stack) ---
-  const handleDownloadTXT = (bilhetes, tipoOrigem, numConcurso) => {
-    if (!bilhetes || bilhetes.length === 0) return;
+  const handleDownloadTXT = (bilhetesObj, tipoOrigem, numConcurso) => {
+    if (!bilhetesObj) return;
     
     let texto = `========================================\n`;
     texto += ` LOTOFÁCIL IA v8.0 - REGISTRO DE JOGOS\n`;
     texto += `========================================\n`;
-    texto += `Origem da Geração: ${tipoOrigem}\n`;
+    texto += `Origem: ${tipoOrigem}\n`;
     texto += `Concurso Alvo: ${numConcurso || "Não informado"}\n`;
-    texto += `Data de Exportação: ${new Date().toLocaleString('pt-BR')}\n`;
-    texto += `Total de Bilhetes: ${bilhetes.length}\n\n`;
+    texto += `Data de Exportação: ${new Date().toLocaleString('pt-BR')}\n\n`;
     
-    bilhetes.forEach((bilhete, index) => {
-      texto += `Bilhete ${String(index + 1).padStart(3, '0')}: ${bilhete.map(dois).join(" - ")}\n`;
-    });
+    texto += `[FRIO - T=0%]:   ${bilhetesObj.frio.map(dois).join(" - ")}\n`;
+    texto += `[MORNO - T=50%]:  ${bilhetesObj.morno.map(dois).join(" - ")}\n`;
+    texto += `[QUENTE - T=100%]: ${bilhetesObj.quente.map(dois).join(" - ")}\n`;
     
     texto += `\n========================================\n`;
-    texto += `Boa sorte! A física quântica e a estatística estão ao seu dispor.\n`;
+    texto += `Boa sorte! Espectro térmico aplicado.\n`;
 
     const blob = new Blob([texto], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     const sufixoConcurso = numConcurso ? `_conc_${numConcurso}` : "";
-    link.download = `lotofacil_${tipoOrigem.toLowerCase().replace(/ /g, '_')}${sufixoConcurso}.txt`;
+    link.download = `lotofacil_${tipoOrigem.toLowerCase().replace(/[\s()]+/g, '_')}${sufixoConcurso}.txt`;
     
     document.body.appendChild(link);
     link.click();
@@ -186,13 +146,12 @@ export default function App() {
   const base = estatisticas?.base;
   const memoria = base?.memoria;
   const desempenho = estatisticas?.desempenho;
-  const grupoValido = selecionadas.length >= 16 && selecionadas.length <= 18;
 
   return (
     <div style={{ maxWidth: "1005px", margin: "0 auto", padding: "20px", fontFamily: "sans-serif" }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
-        <h2>🎲 Lotofácil Engine v8.0 - Sorteio ponderado + Desdobramento + Auditoria</h2>
+        <h2>🎲 Lotofácil Engine v8.0 - Espectro Térmico Automático (3 Bilhetes)</h2>
         <div>
           <span style={{ marginRight: "10px", fontWeight: "bold" }}>
             API: {loadingStats ? "Carregando..." : estatisticas ? "🟢 Online" : "🔴 Offline"}
@@ -261,245 +220,132 @@ export default function App() {
         </div>
       ) : null}
 
-      {/* Gerador */}
+      {/* Gerador Automático (Sorteio Ponderado - 3 Bilhetes) */}
       <div style={{ border: "1px solid #1e40af", padding: "20px", borderRadius: "8px", backgroundColor: "#f0f9ff" }}>
-        <h3>🎲 Gerador de bilhetes (sorteio ponderado)</h3>
+        <h3>🎲 Gerador Automático de Sorteio Ponderado</h3>
         <p style={{ color: "#475569", fontSize: "14px", marginTop: "-5px" }}>
-          Sorteia 15 dezenas distintas com probabilidade proporcional aos pesos ativos da trava.
-          Ajuste a temperatura para injetar aleatoriedade térmica no algoritmo.
+          Ao clicar no botão, o robô gera automaticamente <strong>exatamente 3 bilhetes</strong> com as 3 temperaturas térmicas (Frio, Morno e Quente).
         </p>
 
-        {/* CONTROLE DE TEMPERATURA QUÂNTICA AQUI */}
-        <div style={{ marginBottom: "20px", padding: "15px", backgroundColor: "#e0f2fe", borderRadius: "8px", border: "1px solid #bae6fd" }}>
-          <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold", color: "#0369a1" }}>
-            🔥 Temperatura Quântica (Entropia): {temperatura}%
-          </label>
+        <div style={{ marginBottom: "15px", marginTop: "15px" }}>
+          <label style={{ marginRight: "10px", fontWeight: "bold" }}>Concurso (opcional):</label>
           <input
-            type="range"
-            min="0" max="100"
-            value={temperatura}
-            onChange={(e) => setTemperatura(e.target.value)}
-            style={{ width: "100%", cursor: "pointer" }}
+            type="number"
+            min="1"
+            value={concurso}
+            onChange={(e) => setConcurso(e.target.value)}
+            placeholder="ex.: 3800"
+            style={{ width: "100px", padding: "6px", borderRadius: "4px", border: "1px solid #ccc" }}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#0284c7", marginTop: "5px" }}>
-            <span>0% (Pesos Históricos)</span>
-            <span>100% (Sorteio Uniforme / Caos)</span>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: "20px", alignItems: "center", marginBottom: "15px", flexWrap: "wrap" }}>
-          <div>
-            <label style={{ marginRight: "10px", fontWeight: "bold" }}>Quantidade de Bilhetes:</label>
-            <input
-              type="number"
-              min="1" max="100"
-              value={quantidade}
-              onChange={(e) => setQuantidade(e.target.value)}
-              style={{ width: "70px", padding: "6px", borderRadius: "4px", border: "1px solid #ccc" }}
-            />
-          </div>
-
-          <div>
-            <label style={{ marginRight: "10px", fontWeight: "bold" }}>Concurso (opcional):</label>
-            <input
-              type="number"
-              min="1"
-              value={concurso}
-              onChange={(e) => setConcurso(e.target.value)}
-              placeholder="ex.: 3800"
-              style={{ width: "100px", padding: "6px", borderRadius: "4px", border: "1px solid #ccc" }}
-            />
-          </div>
         </div>
 
         <button
           onClick={handleGerarJogos}
           disabled={loadingGerar}
-          style={{ padding: "10px 20px", backgroundColor: "#1e40af", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
+          style={{ padding: "12px 24px", backgroundColor: "#1d4ed8", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold", fontSize: "15px" }}
         >
-          {loadingGerar ? "Gerando..." : "🎯 Gerar Bilhetes"}
+          {loadingGerar ? "Gerando 3 Bilhetes Térmicos..." : "🎯 Gerar Bilhetes (Frio, Morno, Quente)"}
         </button>
       </div>
 
-      {/* Exibição dos bilhetes */}
-      {resultadoGeracao && resultadoGeracao.bilhetes && resultadoGeracao.bilhetes.length > 0 && (
-        <div style={{ marginTop: "30px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
-            <h3>🎟 Bilhetes gerados ({resultadoGeracao.bilhetes.length})</h3>
-            
+      {/* Exibição dos 3 Bilhetes de Sorteio */}
+      {resultadoGeracao && resultadoGeracao.bilhetes && (
+        <div style={{ marginTop: "30px", border: "1px solid #22c55e", padding: "20px", borderRadius: "8px", backgroundColor: "#f0fdf4" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "15px" }}>
+            <h3 style={{ margin: 0, color: "#166534" }}>🎟️ 3 Bilhetes Térmicos Gerados (Concurso: {resultadoGeracao.concurso ?? "Não informado"})</h3>
             <button
-              onClick={() => handleDownloadTXT(resultadoGeracao.bilhetes, `Sorteio Ponderado (Temp: ${resultadoGeracao.temperatura_aplicada}%)`, resultadoGeracao.concurso)}
-              style={{ padding: "8px 16px", backgroundColor: "#15803d", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px" }}
+              onClick={() => handleDownloadTXT(resultadoGeracao.bilhetes, "Sorteio Ponderado Triplo", resultadoGeracao.concurso)}
+              style={{ padding: "8px 16px", backgroundColor: "#15803d", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
             >
-               📥 Salvar em TXT
+               📥 Salvar os 3 em TXT
             </button>
           </div>
-          
-          <p style={{ color: "#555", fontSize: "13px", marginTop: "-5px" }}>
-            Concurso: <strong>{resultadoGeracao.concurso ?? "não informado"}</strong> {" | "}
-            Temperatura: <strong>{resultadoGeracao.temperatura_aplicada}%</strong> {" | "}
-            Trava de pesos: <strong>{resultadoGeracao.trava_valida ? "validada" : "não ativa"}</strong>
-          </p>
 
-          {resultadoGeracao.bilhetes.map((bilhete, index) => (
-            <div key={index} style={{ border: "1px solid #22c55e", padding: "15px", borderRadius: "8px", marginBottom: "10px", backgroundColor: "#f0fdf4" }}>
-              <p style={{ fontSize: "16px", fontWeight: "bold", color: "#166534", margin: "0", letterSpacing: "1px" }}>
-                Bilhete {index + 1}: {bilhete.map(dois).join(" - ")}
-              </p>
-            </div>
-          ))}
+          <div style={{ padding: "10px", margin: "8px 0", backgroundColor: "#fff", borderRadius: "6px", border: "1px solid #bae6fd" }}>
+            <strong style={{ color: "#0369a1" }}>🧊 Bilhete Frio (T = 0% - Histórico):</strong>
+            <p style={{ fontSize: "16px", fontWeight: "bold", margin: "5px 0 0 0", letterSpacing: "1px" }}>
+              {resultadoGeracao.bilhetes.frio.map(dois).join(" - ")}
+            </p>
+          </div>
 
-          {resultadoGeracao.aviso && (
-            <div style={{ padding: "12px", backgroundColor: "#f1f5f9", color: "#334155", borderRadius: "6px", marginTop: "15px", fontSize: "13px" }}>
-              ℹ️ {resultadoGeracao.aviso}
-            </div>
-          )}
+          <div style={{ padding: "10px", margin: "8px 0", backgroundColor: "#fff", borderRadius: "6px", border: "1px solid #fef08a" }}>
+            <strong style={{ color: "#a16207" }}>🌤️ Bilhete Morno (T = 50% - Superposição):</strong>
+            <p style={{ fontSize: "16px", fontWeight: "bold", margin: "5px 0 0 0", letterSpacing: "1px" }}>
+              {resultadoGeracao.bilhetes.morno.map(dois).join(" - ")}
+            </p>
+          </div>
+
+          <div style={{ padding: "10px", margin: "8px 0", backgroundColor: "#fff", borderRadius: "6px", border: "1px solid #fecaca" }}>
+            <strong style={{ color: "#b91c1c" }}>🔥 Bilhete Quente (T = 100% - Caos):</strong>
+            <p style={{ fontSize: "16px", fontWeight: "bold", margin: "5px 0 0 0", letterSpacing: "1px" }}>
+              {resultadoGeracao.bilhetes.quente.map(dois).join(" - ")}
+            </p>
+          </div>
         </div>
       )}
 
-      {/* Desdobramento */}
+      {/* Desdobramento Automático Espectral */}
       <div style={{ border: "1px solid #7c3aed", padding: "20px", borderRadius: "8px", backgroundColor: "#faf5ff", marginTop: "30px" }}>
-        <h3>🧩 Desdobramento com garantia</h3>
+        <h3>🧩 Gerador Automático de Desdobramento Espectral</h3>
         <p style={{ color: "#475569", fontSize: "14px", marginTop: "-5px" }}>
-          Escolha de 16 a 18 dezenas. O sistema monta o menor conjunto que ele encontra de bilhetes de 15 dezenas
-          que garante o mínimo de acertos escolhido, <strong>desde que as 15 sorteadas estejam todas dentro do seu grupo</strong>.
-          Isso não aumenta o valor esperado da aposta; só organiza como o dinheiro é distribuído.
+          Ao clicar no botão abaixo, o robô seleciona automaticamente os pools térmicos e entrega <strong>exatamente 3 bilhetes</strong> de desdobramento (Frio, Morno e Quente).
         </p>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 44px)", gap: "6px", margin: "15px 0" }}>
-          {TODAS.map((d) => {
-            const ativa = selecionadas.includes(d);
-            return (
-              <button
-                key={d}
-                onClick={() => alternarDezena(d)}
-                style={{
-                  height: "40px", cursor: "pointer", borderRadius: "50%", fontWeight: "bold",
-                  border: ativa ? "2px solid #6d28d9" : "1px solid #cbd5e1",
-                  backgroundColor: ativa ? "#7c3aed" : "#fff",
-                  color: ativa ? "#fff" : "#334155"
-                }}
-              >
-                {dois(d)}
-              </button>
-            );
-          })}
-        </div>
-
-        <p style={{ fontSize: "14px", margin: "0 0 12px 0" }}>
-          Selecionadas: <strong>{selecionadas.length}</strong> (precisa de 16 a 18)
-          {selecionadas.length > 0 && <> {" | "}{selecionadas.map(dois).join(" ")}</>}
-        </p>
-
-        <div style={{ display: "flex", gap: "15px", alignItems: "center", flexWrap: "wrap", marginBottom: "15px" }}>
-          <div>
-            <label style={{ marginRight: "8px", fontWeight: "bold" }}>Garantia:</label>
-            <select
-              value={garantia}
-              onChange={(e) => { setGarantia(e.target.value); setResultadoDesd(null); }}
-              style={{ padding: "6px", borderRadius: "4px", border: "1px solid #ccc" }}
-            >
-              {[11, 12, 13, 14].map((g) => <option key={g} value={g}>{g} acertos</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label style={{ marginRight: "8px", fontWeight: "bold" }}>Concurso (opcional):</label>
-            <input
-              type="number"
-              min="1"
-              value={concursoDesd}
-              onChange={(e) => setConcursoDesd(e.target.value)}
-              placeholder="ex.: 3800"
-              style={{ width: "100px", padding: "6px", borderRadius: "4px", border: "1px solid #ccc" }}
-            />
-          </div>
-
-          <div>
-            <select
-              value={tamanhoSorteio}
-              onChange={(e) => setTamanhoSorteio(parseInt(e.target.value, 10))}
-              style={{ padding: "6px", borderRadius: "4px", border: "1px solid #ccc", marginRight: "6px" }}
-            >
-              {[16, 17, 18].map((k) => <option key={k} value={k}>{k} dezenas</option>)}
-            </select>
-            <button
-              onClick={sortearGrupo}
-              style={{ padding: "8px 12px", cursor: "pointer", backgroundColor: "#e2e8f0", color: "#334155", border: "1px solid #cbd5e1", borderRadius: "4px" }}
-            >
-              🎲 Sortear grupo
-            </button>
-            <button
-              onClick={() => { setSelecionadas([]); setResultadoDesd(null); setErroDesd(""); }}
-              style={{ padding: "8px 12px", cursor: "pointer", marginLeft: "6px", backgroundColor: "#fff", color: "#334155", border: "1px solid #cbd5e1", borderRadius: "4px" }}
-            >
-              Limpar
-            </button>
-          </div>
+        <div style={{ marginBottom: "15px", marginTop: "15px" }}>
+          <label style={{ marginRight: "10px", fontWeight: "bold" }}>Concurso (opcional):</label>
+          <input
+            type="number"
+            min="1"
+            value={concursoDesd}
+            onChange={(e) => setConcursoDesd(e.target.value)}
+            placeholder="ex.: 3800"
+            style={{ width: "100px", padding: "6px", borderRadius: "4px", border: "1px solid #ccc" }}
+          />
         </div>
 
         <button
-          onClick={handleDesdobrar}
-          disabled={loadingDesd || !grupoValido}
-          style={{
-            padding: "10px 20px", backgroundColor: grupoValido ? "#6d28d9" : "#a78bfa", color: "#fff",
-            border: "none", borderRadius: "5px", cursor: grupoValido ? "pointer" : "not-allowed", fontWeight: "bold"
-          }}
+          onClick={handleDesdobrarEspectro}
+          disabled={loadingDesd}
+          style={{ padding: "12px 24px", backgroundColor: "#4f46e5", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold", fontSize: "15px" }}
         >
-          {loadingDesd ? "Calculando e verificando..." : "🧩 Gerar Desdobramento"}
+          {loadingDesd ? "Calculando Desdobramento..." : "🧩 Gerar Desdobramento (Frio, Morno, Quente)"}
         </button>
 
-        {erroDesd && (
-          <div style={{ padding: "12px", backgroundColor: "#fee2e2", color: "#991b1b", borderRadius: "6px", marginTop: "15px" }}>
-            {erroDesd}
-          </div>
-        )}
+        {erroDesd && <div style={{ padding: "12px", backgroundColor: "#fee2e2", color: "#991b1b", borderRadius: "6px", marginTop: "15px" }}>{erroDesd}</div>}
       </div>
 
+      {/* Exibição dos 3 Bilhetes de Desdobramento */}
       {resultadoDesd && resultadoDesd.bilhetes && (
-        <div style={{ marginTop: "20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
-            <h3>🧩 {resultadoDesd.quantidade_bilhetes} bilhetes para garantir {resultadoDesd.garantia_pedida} acertos</h3>
-            
+        <div style={{ marginTop: "30px", border: "1px solid #a78bfa", padding: "20px", borderRadius: "8px", backgroundColor: "#faf5ff" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "15px" }}>
+            <h3 style={{ margin: 0, color: "#5b21b6" }}>🧩 3 Bilhetes de Desdobramento Gerados (Concurso: {resultadoDesd.concurso ?? "Não informado"})</h3>
             <button
-              onClick={() => handleDownloadTXT(resultadoDesd.bilhetes, "Desdobramento", resultadoDesd.concurso)}
-              style={{ padding: "8px 16px", backgroundColor: "#15803d", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px" }}
+              onClick={() => handleDownloadTXT(resultadoDesd.bilhetes, "Desdobramento Espectral Triplo", resultadoDesd.concurso)}
+              style={{ padding: "8px 16px", backgroundColor: "#6d28d9", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
             >
-               📥 Salvar em TXT
+               📥 Salvar os 3 em TXT
             </button>
           </div>
-          
-          <p style={{ color: "#555", fontSize: "13px", marginTop: "-5px" }}>
-            Garantia verificada por força bruta: <strong>{resultadoDesd.garantia_verificada ? "sim ✅" : "não ❌"}</strong> {" | "}
-            Chance de as 15 sorteadas caírem no seu grupo: <strong>1 em {Number(resultadoDesd.um_em).toLocaleString("pt-BR")}</strong>
-          </p>
-          <p style={{ color: "#555", fontSize: "13px" }}>
-            Se isso acontecer, melhor resultado por sorteio possível:{" "}
-            {Object.entries(resultadoDesd.melhor_acerto_se_pool_conter_sorteio)
-              .map(([acertos, qtd]) => `${acertos} acertos em ${qtd} sorteios`)
-              .join(" | ")}
-          </p>
 
-          {resultadoDesd.registro && (
-            <p style={{ color: "#166534", fontSize: "13px" }}>
-              Concurso {resultadoDesd.concurso}: comprovantes{" "}
-              {resultadoDesd.registro.comprovantes
-                ? `gravados (${resultadoDesd.registro.comprovantes.novos} novos)`
-                : "não gravados"}
-              {" | "}diário {resultadoDesd.registro.diario_salvo ? "registrado" : "não registrado"}.
+          <div style={{ padding: "10px", margin: "8px 0", backgroundColor: "#fff", borderRadius: "6px", border: "1px solid #bae6fd" }}>
+            <strong style={{ color: "#0369a1" }}>🧊 Desdobramento Frio:</strong>
+            <p style={{ fontSize: "16px", fontWeight: "bold", margin: "5px 0 0 0", letterSpacing: "1px" }}>
+              {resultadoDesd.bilhetes.frio.map(dois).join(" - ")}
             </p>
-          )}
+          </div>
 
-          {resultadoDesd.bilhetes.map((bilhete, index) => (
-            <div key={index} style={{ border: "1px solid #a78bfa", padding: "12px", borderRadius: "8px", marginBottom: "8px", backgroundColor: "#faf5ff" }}>
-              <p style={{ fontSize: "15px", fontWeight: "bold", color: "#5b21b6", margin: 0, letterSpacing: "1px" }}>
-                Bilhete {index + 1}: {bilhete.map(dois).join(" - ")}
-              </p>
-            </div>
-          ))}
+          <div style={{ padding: "10px", margin: "8px 0", backgroundColor: "#fff", borderRadius: "6px", border: "1px solid #fef08a" }}>
+            <strong style={{ color: "#a16207" }}>🌤️ Desdobramento Morno:</strong>
+            <p style={{ fontSize: "16px", fontWeight: "bold", margin: "5px 0 0 0", letterSpacing: "1px" }}>
+              {resultadoDesd.bilhetes.morno.map(dois).join(" - ")}
+            </p>
+          </div>
 
-          <div style={{ padding: "12px", backgroundColor: "#f1f5f9", color: "#334155", borderRadius: "6px", marginTop: "10px", fontSize: "13px" }}>
-            ℹ️ {resultadoDesd.observacao}
+          <div style={{ padding: "10px", margin: "8px 0", backgroundColor: "#fff", borderRadius: "6px", border: "1px solid #fecaca" }}>
+            <strong style={{ color: "#b91c1c" }}>🔥 Desdobramento Quente:</strong>
+            <p style={{ fontSize: "16px", fontWeight: "bold", margin: "5px 0 0 0", letterSpacing: "1px" }}>
+              {resultadoDesd.bilhetes.quente.map(dois).join(" - ")}
+            </p>
           </div>
         </div>
       )}
