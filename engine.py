@@ -12,7 +12,7 @@ QUANTIDADE_MAXIMA = 100
 AVISO = (
     "Os sorteios da Lotofácil são aleatórios: estes bilhetes não têm mais chance "
     "de acertar do que quaisquer outros de 15 dezenas. "
-    "[ESPECTRO TÉRMICO AUTOMÁTICO ATIVADO]"
+    "[ESPECTRO TÉRMICO ESTRATIFICADO ATIVADO]"
 )
 
 
@@ -47,6 +47,32 @@ def sortear_bilhete(pesos_lista: Sequence[float], rng=None) -> List[int]:
         bilhete.append(populacao.pop(i))
         restantes.pop(i)
     return sorted(bilhete)
+
+
+def sortear_bilhete_estratificado_morno(pesos_lista: Sequence[float], rng=None) -> List[int]:
+    rng = rng or secrets.SystemRandom()
+    
+    faixa1 = list(range(1, 12))   # 1 a 11 (11 dezenas) -> sortear 7
+    faixa2 = list(range(12, 19))  # 12 a 18 (7 dezenas) -> sortear 4
+    faixa3 = list(range(19, 26))  # 19 a 25 (7 dezenas) -> sortear 4
+
+    def escolher_da_faixa(faixa, k):
+        sub_pop = list(faixa)
+        sub_pesos = [pesos_lista[d - 1] for d in sub_pop]
+        escolhidos = []
+        for _ in range(k):
+            if sum(sub_pesos) <= 0:
+                idx = rng.randrange(len(sub_pop))
+            else:
+                idx = rng.choices(range(len(sub_pop)), weights=sub_pesos, k=1)[0]
+            escolhidos.append(sub_pop.pop(idx))
+            sub_pesos.pop(idx)
+        return escolhidos
+
+    b1 = escolher_da_faixa(faixa1, 7)
+    b2 = escolher_da_faixa(faixa2, 4)
+    b3 = escolher_da_faixa(faixa3, 4)
+    return sorted(b1 + b2 + b3)
 
 
 def pesos_por_frequencia(sorteios: Sequence[Sequence[int]], janela: Optional[int] = None) -> Dict[str, float]:
@@ -85,19 +111,24 @@ def gerar_jogos_genetico(quantidade=1, concurso=None, caminho_pesos=None, pesos=
 
     pesos_lista = _pesos_por_dezena(extrair_pesos_dict(pesos_dict))
 
-    if temperatura > 0.0:
-        t_norm = max(0.0, min(temperatura, 100.0)) / 100.0
-        if pesos_lista:
-            peso_medio = sum(pesos_lista) / len(pesos_lista)
-            pesos_lista = [p * (1.0 - t_norm) + (peso_medio * t_norm) for p in pesos_lista]
+    if abs(temperatura - 50.0) < 1e-5:
+        bilhete = sortear_bilhete_estratificado_morno(pesos_lista, rng)
+        jogos = [bilhete]
+    else:
+        if temperatura > 0.0:
+            t_norm = max(0.0, min(temperatura, 100.0)) / 100.0
+            if pesos_lista:
+                peso_medio = sum(pesos_lista) / len(pesos_lista)
+                pesos_lista = [p * (1.0 - t_norm) + (peso_medio * t_norm) for p in pesos_lista]
 
-    jogos = [sortear_bilhete(pesos_lista, rng) for _ in range(quantidade)]
+        jogos = [sortear_bilhete(pesos_lista, rng) for _ in range(quantidade)]
+
     hashes = [_hash_bilhete(b) for b in jogos]
 
     return {
         "status": "sucesso",
         "concurso": concurso,
-        "quantidade": quantidade,
+        "quantidade": len(jogos),
         "jogos": jogos,
         "bilhetes": jogos,
         "hashes": hashes,
