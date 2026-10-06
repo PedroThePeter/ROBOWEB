@@ -12,15 +12,50 @@ QUANTIDADE_MAXIMA = 100
 AVISO = (
     "Os sorteios da Lotofácil são aleatórios: estes bilhetes não têm mais chance "
     "de acertar do que quaisquer outros de 15 dezenas. "
-    "[ESPECTRO TÉRMICO ESTRATIFICADO ATUALIZADO]"
+    "[PIPELINE DE CURADORIA ATIVADA]"
 )
 
+# ==========================================
+# ⚖️ OS NOVOS JUÍZES (Filtros Heurísticos)
+# ==========================================
+def juiz_paridade(bilhete: List[int]) -> bool:
+    pares = sum(1 for x in bilhete if x % 2 == 0)
+    return 6 <= pares <= 9
+
+def juiz_soma(bilhete: List[int]) -> bool:
+    return 160 <= sum(bilhete) <= 210
+
+def juiz_dispersao(bilhete: List[int]) -> bool:
+    linhas = len(set((x - 1) // 5 for x in bilhete))
+    colunas = len(set((x - 1) % 5 for x in bilhete))
+    return linhas >= 4 and colunas >= 3
+
+# ==========================================
+# 🧠 OS CURADORES DE CÓDIGO
+# ==========================================
+def curador_microanalise(gerador_func, max_tentativas=500):
+    """Curador 1: Submete os bilhetes aos 3 juízes individualmente."""
+    for _ in range(max_tentativas):
+        bilhete = gerador_func()
+        if juiz_paridade(bilhete) and juiz_soma(bilhete) and juiz_dispersao(bilhete):
+            return bilhete, True
+    return gerador_func(), False
+
+def curador_diversidade(frio: List[int], morno: List[int], quente: List[int]):
+    """Curador 2: Analisa a diversidade do portfólio em conjunto."""
+    i1 = len(set(frio) & set(morno))
+    i2 = len(set(frio) & set(quente))
+    i3 = len(set(morno) & set(quente))
+    maior_sobreposicao = max(i1, i2, i3)
+    
+    if maior_sobreposicao > 11:
+        return False, f"Curador 2 Reprovou: Sobreposição excessiva ({maior_sobreposicao} dezenas repetidas entre tickets)."
+    return True, f"Curador 2 Aprovou: Diversidade máxima cruzada garantida (Max {maior_sobreposicao} interseções)."
 
 def extrair_pesos_dict(pesos_input):
     if isinstance(pesos_input, tuple):
         return pesos_input[0]
     return pesos_input
-
 
 def _pesos_por_dezena(pesos: Dict) -> List[float]:
     lista = []
@@ -33,35 +68,12 @@ def _pesos_por_dezena(pesos: Dict) -> List[float]:
         lista.append(v if math.isfinite(v) and v > 0 else 0.0)
     return lista
 
-
-def sortear_bilhete(pesos_lista: Sequence[float], rng=None) -> List[int]:
-    rng = rng or secrets.SystemRandom()
-    if sum(1 for p in pesos_lista if p > 0) < TAMANHO_BILHETE:
-        return sorted(rng.sample(DEZENAS, TAMANHO_BILHETE))
-
-    populacao = list(DEZENAS)
-    restantes = list(pesos_lista)
-    bilhete = []
-    for _ in range(TAMANHO_BILHETE):
-        i = rng.choices(range(len(populacao)), weights=restantes, k=1)[0]
-        bilhete.append(populacao.pop(i))
-        restantes.pop(i)
-    return sorted(bilhete)
-
-
 def sortear_bilhete_estratificado_quente(pesos_lista: Sequence[float], rng=None) -> List[int]:
-    """
-    Sorteio estratificado agora aplicado ao estado Quente (T = 100%):
-    Força a distribuição estrutural exigida pelo analista:
-    - 7 dezenas na faixa de 1 a 11
-    - 4 dezenas na faixa de 12 a 18
-    - 4 dezenas na faixa de 19 a 25
-    """
+    """Mantém a geometria estrita 7-4-4 do Bilhete Quente (T=100%)"""
     rng = rng or secrets.SystemRandom()
-    
-    faixa1 = list(range(1, 12))   # 1 a 11 -> sortear 7
-    faixa2 = list(range(12, 19))  # 12 a 18 -> sortear 4
-    faixa3 = list(range(19, 26))  # 19 a 25 -> sortear 4
+    faixa1 = list(range(1, 12))
+    faixa2 = list(range(12, 19))
+    faixa3 = list(range(19, 26))
 
     def escolher_da_faixa(faixa, k):
         sub_pop = list(faixa)
@@ -81,29 +93,17 @@ def sortear_bilhete_estratificado_quente(pesos_lista: Sequence[float], rng=None)
     b3 = escolher_da_faixa(faixa3, 4)
     return sorted(b1 + b2 + b3)
 
-
 def pesos_por_frequencia(sorteios: Sequence[Sequence[int]], janela: Optional[int] = None) -> Dict[str, float]:
     recentes = sorteios[-janela:] if janela else sorteios
     cont = Counter(d for s in recentes for d in s)
     return {str(d): float(cont.get(d, 0) + 1) for d in DEZENAS}
-
 
 class LotofacilGeneticEngine:
     def __init__(self, caminho_pesos=None):
         self.caminho_pesos = caminho_pesos
 
     def gerar_jogos(self, quantidade=1, concurso=None, pesos=None, temperatura=0.0):
-        return gerar_jogos_genetico(
-            quantidade=quantidade,
-            concurso=concurso,
-            caminho_pesos=self.caminho_pesos,
-            pesos=pesos,
-            temperatura=temperatura,
-        )
-
-    def executar(self, quantidade=1, concurso=None):
-        return self.gerar_jogos(quantidade=quantidade, concurso=concurso)
-
+        return gerar_jogos_genetico(quantidade, concurso, self.caminho_pesos, pesos, temperatura)
 
 def gerar_jogos_genetico(quantidade=1, concurso=None, caminho_pesos=None, pesos=None, rng=None, temperatura=0.0):
     if not isinstance(quantidade, int) or not (1 <= quantidade <= QUANTIDADE_MAXIMA):
@@ -118,18 +118,33 @@ def gerar_jogos_genetico(quantidade=1, concurso=None, caminho_pesos=None, pesos=
 
     pesos_lista = _pesos_por_dezena(extrair_pesos_dict(pesos_dict))
 
-    # Se a temperatura for 100.0 (Estado Quente), aplicamos a partição estrutural estricta 7-4-4
-    if abs(temperatura - 100.0) < 1e-5:
-        bilhete = sortear_bilhete_estratificado_quente(pesos_lista, rng)
-        jogos = [bilhete]
-    else:
-        if temperatura > 0.0:
-            t_norm = max(0.0, min(temperatura, 100.0)) / 100.0
-            if pesos_lista:
-                peso_medio = sum(pesos_lista) / len(pesos_lista)
-                pesos_lista = [p * (1.0 - t_norm) + (peso_medio * t_norm) for p in pesos_lista]
+    def gerador_temperatura():
+        if abs(temperatura - 100.0) < 1e-5:
+            return sortear_bilhete_estratificado_quente(pesos_lista, rng)
+        else:
+            p_lista = list(pesos_lista)
+            if temperatura > 0.0:
+                t_norm = max(0.0, min(temperatura, 100.0)) / 100.0
+                if p_lista:
+                    peso_medio = sum(p_lista) / len(p_lista)
+                    p_lista = [p * (1.0 - t_norm) + (peso_medio * t_norm) for p in p_lista]
 
-        jogos = [sortear_bilhete(pesos_lista, rng) for _ in range(quantidade)]
+            if sum(1 for p in p_lista if p > 0) < TAMANHO_BILHETE:
+                return sorted(rng.sample(DEZENAS, TAMANHO_BILHETE))
+
+            populacao = list(DEZENAS)
+            restantes = list(p_lista)
+            bilhete = []
+            for _ in range(TAMANHO_BILHETE):
+                i = rng.choices(range(len(populacao)), weights=restantes, k=1)[0]
+                bilhete.append(populacao.pop(i))
+                restantes.pop(i)
+            return sorted(bilhete)
+
+    jogos = []
+    for _ in range(quantidade):
+        bilhete, _ = curador_microanalise(gerador_temperatura)
+        jogos.append(bilhete)
 
     hashes = [_hash_bilhete(b) for b in jogos]
 

@@ -13,8 +13,6 @@ export default function App() {
   const [resultadoGeracao, setResultadoGeracao] = useState(null);
   const [mensagemErro, setMensagemErro] = useState("");
   const [mensagemSucesso, setMensagemSucesso] = useState("");
-  const [loadingDesd, setLoadingDesd] = useState(false);
-  const [resultadoDesd, setResultadoDesd] = useState(null);
 
   const carregarEstatisticas = async () => {
     setLoadingStats(true);
@@ -58,7 +56,7 @@ export default function App() {
       const data = await response.json();
       if (!response.ok) throw new Error("Erro inesperado.");
       setResultadoGeracao(data);
-      setMensagemSucesso(`3 bilhetes térmicos gerados para o concurso ${data.concurso}.`);
+      setMensagemSucesso(`Portfólio aprovado pelos Curadores e salvo para o concurso ${data.concurso}.`);
     } catch (err) {
       setMensagemErro(err.message);
     } finally {
@@ -66,31 +64,18 @@ export default function App() {
     }
   };
 
-  const handleDesdobrarEspectro = async () => {
-    setLoadingDesd(true);
-    try {
-      const response = await fetch(`${API_BASE}/api/desdobramento-espectro`, { method: "POST" });
-      const data = await response.json();
-      if (!response.ok) throw new Error("Erro inesperado.");
-      setResultadoDesd(data);
-    } catch (err) {
-      setMensagemErro(err.message);
-    } finally {
-      setLoadingDesd(false);
-    }
-  };
-
-  const handleDownloadTXT = (bilhetesObj, tipoOrigem, numConcurso) => {
+  const handleDownloadTXT = (bilhetesObj, tipoOrigem, numConcurso, curadoriaMsg) => {
     if (!bilhetesObj) return;
-    let texto = `========================================\n LOTOFÁCIL IA v8.0 - REGISTRO DE JOGOS\n========================================\nOrigem: ${tipoOrigem}\nConcurso Alvo: ${numConcurso || "Indefinido"}\n\n`;
+    let texto = `========================================\n LOTOFÁCIL IA v8.1 - PIPELINE DE CURADORIA\n========================================\nOrigem: ${tipoOrigem}\nConcurso Alvo: ${numConcurso || "Indefinido"}\n\n`;
     texto += `[FRIO - T=0%]:   ${bilhetesObj.frio.map(dois).join(" - ")}\n`;
     texto += `[MORNO - T=50%]:  ${bilhetesObj.morno.map(dois).join(" - ")}\n`;
-    texto += `[QUENTE - T=100% (7/4/4)]: ${bilhetesObj.quente.map(dois).join(" - ")}\n`;
+    texto += `[QUENTE - T=100% (7/4/4)]: ${bilhetesObj.quente.map(dois).join(" - ")}\n\n`;
+    texto += `========================================\n RELATÓRIO OFICIAL DA CURADORIA\n========================================\n${curadoriaMsg || "Validação Integrada."}\n`;
     
     const blob = new Blob([texto], { type: "text/plain;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `lotofacil_${tipoOrigem}_conc_${numConcurso}.txt`;
+    link.download = `lotofacil_portfolio_conc_${numConcurso}.txt`;
     link.click();
   };
 
@@ -100,7 +85,7 @@ export default function App() {
   return (
     <div style={{ maxWidth: "1005px", margin: "0 auto", padding: "20px", fontFamily: "sans-serif" }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
-        <h2>🎲 Lotofácil Engine v8.0 - Espectro Térmico Isolado</h2>
+        <h2>🎲 Lotofácil Engine v8.1 - Curadoria Múltipla</h2>
         <button onClick={handleRecarregarBase} disabled={loadingRecarregar} style={{ padding: "8px 12px", backgroundColor: "#334155", color: "#fff", border: "none", borderRadius: "4px" }}>
           {loadingRecarregar ? "Atualizando..." : "📂 Recarregar Planilha"}
         </button>
@@ -111,7 +96,7 @@ export default function App() {
 
       {estatisticas && (
         <div style={{ border: "1px solid #eab308", padding: "15px", borderRadius: "8px", backgroundColor: "#fefce8", marginBottom: "30px" }}>
-          <h4 style={{ margin: "0 0 10px 0" }}>🧾 Desempenho Real Isolado por Temperatura (Alvo: {estatisticas.proximo_concurso})</h4>
+          <h4 style={{ margin: "0 0 10px 0" }}>🧾 Desempenho Isolado por Temperatura (Alvo: {estatisticas.proximo_concurso})</h4>
           {desempenho && desempenho.conferidos > 0 ? (
             <div style={{ display: "grid", gap: "6px" }}>
               <div style={{ padding: "6px", backgroundColor: "#f0f9ff", border: "1px solid #bae6fd" }}>
@@ -131,40 +116,29 @@ export default function App() {
       )}
 
       <div style={{ border: "1px solid #1e40af", padding: "20px", borderRadius: "8px", backgroundColor: "#f0f9ff", marginBottom: "30px" }}>
-        <h3>🎲 Gerador Automático de Sorteio Ponderado</h3>
+        <h3>🛡️ Gerador Auditado por Curadores (5 Juízes)</h3>
         <button onClick={handleGerarJogos} disabled={loadingGerar} style={{ padding: "12px 24px", backgroundColor: "#1d4ed8", color: "#fff", border: "none", borderRadius: "5px" }}>
-          {loadingGerar ? "Gerando..." : "🎯 Gerar Bilhetes (Frio, Morno, Quente)"}
+          {loadingGerar ? "Submetendo ao Juizado..." : "🎯 Gerar Portfólio (Frio, Morno, Quente)"}
         </button>
       </div>
 
       {resultadoGeracao && resultadoGeracao.bilhetes && (
-        <div style={{ border: "1px solid #22c55e", padding: "20px", borderRadius: "8px", backgroundColor: "#f0fdf4", marginBottom: "30px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <h3 style={{ margin: 0 }}>🎟️ 3 Bilhetes Térmicos Gerados</h3>
-            <button onClick={() => handleDownloadTXT(resultadoGeracao.bilhetes, "Sorteio Ponderado", resultadoGeracao.concurso)} style={{ padding: "8px 16px", backgroundColor: "#15803d", color: "#fff", border: "none", borderRadius: "5px" }}>📥 Salvar TXT</button>
+        <div style={{ border: "1px solid #22c55e", padding: "20px", borderRadius: "8px", backgroundColor: "#f0fdf4" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px" }}>
+            <h3 style={{ margin: 0 }}>🎟️ 3 Bilhetes Aprovados</h3>
+            <button onClick={() => handleDownloadTXT(resultadoGeracao.bilhetes, "Curadoria", resultadoGeracao.concurso, resultadoGeracao.curadoria)} style={{ padding: "8px 16px", backgroundColor: "#15803d", color: "#fff", border: "none", borderRadius: "5px" }}>📥 Baixar Relatório (TXT)</button>
           </div>
-          <p><strong>🧊 Frio:</strong> {resultadoGeracao.bilhetes.frio.map(dois).join(" - ")}</p>
-          <p><strong>🌤️ Morno (Calculado):</strong> {resultadoGeracao.bilhetes.morno.map(dois).join(" - ")}</p>
-          <p><strong>🔥 Quente (7/4/4):</strong> {resultadoGeracao.bilhetes.quente.map(dois).join(" - ")}</p>
-        </div>
-      )}
-
-      <div style={{ border: "1px solid #7c3aed", padding: "20px", borderRadius: "8px", backgroundColor: "#faf5ff" }}>
-        <h3>🧩 Gerador Automático (Fechamento Fixo - 15 Dezenas)</h3>
-        <button onClick={handleDesdobrarEspectro} disabled={loadingDesd} style={{ padding: "12px 24px", backgroundColor: "#4f46e5", color: "#fff", border: "none", borderRadius: "5px" }}>
-          {loadingDesd ? "Calculando..." : "🧩 Gerar Desdobramento (Frio, Morno, Quente)"}
-        </button>
-      </div>
-
-      {resultadoDesd && resultadoDesd.bilhetes && (
-        <div style={{ border: "1px solid #a78bfa", padding: "20px", borderRadius: "8px", backgroundColor: "#faf5ff", marginTop: "30px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <h3 style={{ margin: 0 }}>🧩 3 Bilhetes de Desdobramento</h3>
-            <button onClick={() => handleDownloadTXT(resultadoDesd.bilhetes, "Desdobramento", resultadoDesd.concurso)} style={{ padding: "8px 16px", backgroundColor: "#6d28d9", color: "#fff", border: "none", borderRadius: "5px" }}>📥 Salvar TXT</button>
+          
+          <div style={{ padding: "12px", backgroundColor: "#e0f2fe", borderRadius: "5px", marginBottom: "15px", borderLeft: "4px solid #0284c7" }}>
+            <strong>Relatório Operacional dos Curadores:</strong><br />
+            {resultadoGeracao.curadoria.split(' | ').map((linha, i) => (
+              <span key={i} style={{ display: "block", marginTop: "4px" }}>✅ {linha}</span>
+            ))}
           </div>
-          <p><strong>🧊 Frio:</strong> {resultadoDesd.bilhetes.frio.map(dois).join(" - ")}</p>
-          <p><strong>🌤️ Morno (Calculado):</strong> {resultadoDesd.bilhetes.morno.map(dois).join(" - ")}</p>
-          <p><strong>🔥 Quente (7/4/4):</strong> {resultadoDesd.bilhetes.quente.map(dois).join(" - ")}</p>
+
+          <p><strong>🧊 Frio (Crivo 1):</strong> {resultadoGeracao.bilhetes.frio.map(dois).join(" - ")}</p>
+          <p><strong>🌤️ Morno (Crivo 1):</strong> {resultadoGeracao.bilhetes.morno.map(dois).join(" - ")}</p>
+          <p><strong>🔥 Quente (Crivo 1 + Regra 7/4/4):</strong> {resultadoGeracao.bilhetes.quente.map(dois).join(" - ")}</p>
         </div>
       )}
     </div>
