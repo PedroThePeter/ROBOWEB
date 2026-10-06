@@ -206,9 +206,9 @@ def api_gerar_jogos():
             "quente": quente["bilhetes"][0]
         }
 
-        diario.salvar_palpites({"concurso": concurso, "quantidade": 1, "jogos": [bilhetes["frio"]]}, origem="espectro_frio")
-        diario.salvar_palpites({"concurso": concurso, "quantidade": 1, "jogos": [bilhetes["morno"]]}, origem="espectro_morno")
-        diario.salvar_palpites({"concurso": concurso, "quantidade": 1, "jogos": [bilhetes["quente"]]}, origem="espectro_quente")
+        diario.salvar_palpites({"concurso": concurso, "quantidade": 1, "jogos": [bilhetes["frio"]], "hashes": [integridade._hash_bilhete(bilhetes["frio"])]}, origem="espectro_frio")
+        diario.salvar_palpites({"concurso": concurso, "quantidade": 1, "jogos": [bilhetes["morno"]], "hashes": [integridade._hash_bilhete(bilhetes["morno"])]}, origem="espectro_morno")
+        diario.salvar_palpites({"concurso": concurso, "quantidade": 1, "jogos": [bilhetes["quente"]], "hashes": [integridade._hash_bilhete(bilhetes["quente"])]}, origem="espectro_quente")
 
         return {"status": "sucesso", "concurso": concurso, "bilhetes": bilhetes}
     except Exception as e:
@@ -225,12 +225,12 @@ def api_desdobramento_espectro():
         lista_pesos = [float(pesos_dict.get(str(i), 1.0)) for i in range(1, 26)]
         peso_medio = sum(lista_pesos) / len(lista_pesos)
         
-        # Frio (Top 15 dezenas) - Reduzido de 17 para 15 conforme solicitado
+        # Frio (Top 15 dezenas estrito)
         pares_pesos = [(int(k), float(v)) for k, v in pesos_dict.items()]
         pares_pesos.sort(key=lambda x: x[1], reverse=True)
         grupo_frio = sorted([d for d, _ in pares_pesos[:15]])
         
-        # Morno (Sorteio limpo interpolado 50% para Pool de 15 dezenas)
+        # Morno (Sorteio limpo interpolado 50% extraindo exatas 15 dezenas)
         pesos_morno = [p * 0.5 + peso_medio * 0.5 for p in lista_pesos]
         pop_morno = list(range(1, 26))
         restantes_morno = list(pesos_morno)
@@ -241,7 +241,7 @@ def api_desdobramento_espectro():
             restantes_morno.pop(i)
         grupo_morno = sorted(grupo_morno)
 
-        # Quente (Estratificado 7-4-4 para Pool de 15 dezenas)
+        # Quente (Estratificado 7-4-4 puro extraindo exatas 15 dezenas)
         def escolher_da_faixa(faixa, k):
             sub_pop = list(faixa)
             sub_pesos = [lista_pesos[d - 1] for d in sub_pop]
@@ -257,24 +257,22 @@ def api_desdobramento_espectro():
 
         grupo_quente = sorted(escolher_da_faixa(range(1, 12), 7) + escolher_da_faixa(range(12, 19), 4) + escolher_da_faixa(range(19, 26), 4))
 
-        # A matriz extrairá 1 bilhete de cada pool, pois o pool agora tem exatos 15 números.
-        res_frio = desdobramento.gerar_desdobramento(grupo_frio, garantia=14)
-        res_morno = desdobramento.gerar_desdobramento(grupo_morno, garantia=14)
-        res_quente = desdobramento.gerar_desdobramento(grupo_quente, garantia=14)
-
-        # Captura o bilhete (o próprio array de 15)
+        # Os bilhetes agora SÃO OS PRÓPRIOS GRUPOS DE 15 DEZENAS (Omitimos o módulo de desdobramento)
         bilhetes_desd = {
-            "frio": res_frio["bilhetes"][0] if res_frio.get("bilhetes") else grupo_frio,
-            "morno": res_morno["bilhetes"][0] if res_morno.get("bilhetes") else grupo_morno,
-            "quente": res_quente["bilhetes"][0] if res_quente.get("bilhetes") else grupo_quente
+            "frio": grupo_frio,
+            "morno": grupo_morno,
+            "quente": grupo_quente
         }
 
-        diario.salvar_palpites({"concurso": concurso, "quantidade": 1, "jogos": [bilhetes_desd["frio"]]}, origem="espectro_frio")
-        diario.salvar_palpites({"concurso": concurso, "quantidade": 1, "jogos": [bilhetes_desd["morno"]]}, origem="espectro_morno")
-        diario.salvar_palpites({"concurso": concurso, "quantidade": 1, "jogos": [bilhetes_desd["quente"]]}, origem="espectro_quente")
+        # Salva as assinaturas (hashes) restauradas para não quebrar o diario.py
+        diario.salvar_palpites({"concurso": concurso, "quantidade": 1, "jogos": [bilhetes_desd["frio"]], "hashes": [integridade._hash_bilhete(bilhetes_desd["frio"])]}, origem="espectro_frio")
+        diario.salvar_palpites({"concurso": concurso, "quantidade": 1, "jogos": [bilhetes_desd["morno"]], "hashes": [integridade._hash_bilhete(bilhetes_desd["morno"])]}, origem="espectro_morno")
+        diario.salvar_palpites({"concurso": concurso, "quantidade": 1, "jogos": [bilhetes_desd["quente"]], "hashes": [integridade._hash_bilhete(bilhetes_desd["quente"])]}, origem="espectro_quente")
 
         return {"status": "sucesso", "concurso": concurso, "bilhetes": bilhetes_desd}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
