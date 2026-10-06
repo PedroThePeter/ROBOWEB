@@ -220,17 +220,28 @@ def api_desdobramento_espectro():
     concurso = _obter_proximo_concurso()
     try:
         pesos_dict, _ = integridade.carregar_pesos_para_engine()
-        
-        # Frio (Top 17 dezenas)
-        pares_pesos = [(int(k), float(v)) for k, v in pesos_dict.items()]
-        pares_pesos.sort(key=lambda x: x[1], reverse=True)
-        grupo_frio = sorted([d for d, _ in pares_pesos[:17]])
-
         import secrets
         rng = secrets.SystemRandom()
         lista_pesos = [float(pesos_dict.get(str(i), 1.0)) for i in range(1, 26)]
+        peso_medio = sum(lista_pesos) / len(lista_pesos)
         
-        # Morno (Estratificado para Pool de 17 dezenas: 8/5/4)
+        # Frio (Top 15 dezenas) - Reduzido de 17 para 15 conforme solicitado
+        pares_pesos = [(int(k), float(v)) for k, v in pesos_dict.items()]
+        pares_pesos.sort(key=lambda x: x[1], reverse=True)
+        grupo_frio = sorted([d for d, _ in pares_pesos[:15]])
+        
+        # Morno (Sorteio limpo interpolado 50% para Pool de 15 dezenas)
+        pesos_morno = [p * 0.5 + peso_medio * 0.5 for p in lista_pesos]
+        pop_morno = list(range(1, 26))
+        restantes_morno = list(pesos_morno)
+        grupo_morno = []
+        for _ in range(15):
+            i = rng.choices(range(len(pop_morno)), weights=restantes_morno, k=1)[0]
+            grupo_morno.append(pop_morno.pop(i))
+            restantes_morno.pop(i)
+        grupo_morno = sorted(grupo_morno)
+
+        # Quente (Estratificado 7-4-4 para Pool de 15 dezenas)
         def escolher_da_faixa(faixa, k):
             sub_pop = list(faixa)
             sub_pesos = [lista_pesos[d - 1] for d in sub_pop]
@@ -244,19 +255,18 @@ def api_desdobramento_espectro():
                 sub_pesos.pop(idx)
             return escolhidos
 
-        grupo_morno = sorted(escolher_da_faixa(range(1, 12), 8) + escolher_da_faixa(range(12, 19), 5) + escolher_da_faixa(range(19, 26), 4))
-        
-        # Quente
-        grupo_quente = sorted(rng.sample(list(range(1, 26)), 17))
+        grupo_quente = sorted(escolher_da_faixa(range(1, 12), 7) + escolher_da_faixa(range(12, 19), 4) + escolher_da_faixa(range(19, 26), 4))
 
+        # A matriz extrairá 1 bilhete de cada pool, pois o pool agora tem exatos 15 números.
         res_frio = desdobramento.gerar_desdobramento(grupo_frio, garantia=14)
         res_morno = desdobramento.gerar_desdobramento(grupo_morno, garantia=14)
         res_quente = desdobramento.gerar_desdobramento(grupo_quente, garantia=14)
 
+        # Captura o bilhete (o próprio array de 15)
         bilhetes_desd = {
-            "frio": res_frio["bilhetes"][0],
-            "morno": res_morno["bilhetes"][0],
-            "quente": res_quente["bilhetes"][0]
+            "frio": res_frio["bilhetes"][0] if res_frio.get("bilhetes") else grupo_frio,
+            "morno": res_morno["bilhetes"][0] if res_morno.get("bilhetes") else grupo_morno,
+            "quente": res_quente["bilhetes"][0] if res_quente.get("bilhetes") else grupo_quente
         }
 
         diario.salvar_palpites({"concurso": concurso, "quantidade": 1, "jogos": [bilhetes_desd["frio"]]}, origem="espectro_frio")

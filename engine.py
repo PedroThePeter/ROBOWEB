@@ -12,7 +12,7 @@ QUANTIDADE_MAXIMA = 100
 AVISO = (
     "Os sorteios da Lotofácil são aleatórios: estes bilhetes não têm mais chance "
     "de acertar do que quaisquer outros de 15 dezenas. "
-    "[ESPECTRO TÉRMICO ESTRATIFICADO ATIVADO]"
+    "[ESPECTRO TÉRMICO ESTRATIFICADO ATUALIZADO]"
 )
 
 
@@ -49,12 +49,19 @@ def sortear_bilhete(pesos_lista: Sequence[float], rng=None) -> List[int]:
     return sorted(bilhete)
 
 
-def sortear_bilhete_estratificado_morno(pesos_lista: Sequence[float], rng=None) -> List[int]:
+def sortear_bilhete_estratificado_quente(pesos_lista: Sequence[float], rng=None) -> List[int]:
+    """
+    Sorteio estratificado agora aplicado ao estado Quente (T = 100%):
+    Força a distribuição estrutural exigida pelo analista:
+    - 7 dezenas na faixa de 1 a 11
+    - 4 dezenas na faixa de 12 a 18
+    - 4 dezenas na faixa de 19 a 25
+    """
     rng = rng or secrets.SystemRandom()
     
-    faixa1 = list(range(1, 12))   # 1 a 11 (11 dezenas) -> sortear 7
-    faixa2 = list(range(12, 19))  # 12 a 18 (7 dezenas) -> sortear 4
-    faixa3 = list(range(19, 26))  # 19 a 25 (7 dezenas) -> sortear 4
+    faixa1 = list(range(1, 12))   # 1 a 11 -> sortear 7
+    faixa2 = list(range(12, 19))  # 12 a 18 -> sortear 4
+    faixa3 = list(range(19, 26))  # 19 a 25 -> sortear 4
 
     def escolher_da_faixa(faixa, k):
         sub_pop = list(faixa)
@@ -111,8 +118,9 @@ def gerar_jogos_genetico(quantidade=1, concurso=None, caminho_pesos=None, pesos=
 
     pesos_lista = _pesos_por_dezena(extrair_pesos_dict(pesos_dict))
 
-    if abs(temperatura - 50.0) < 1e-5:
-        bilhete = sortear_bilhete_estratificado_morno(pesos_lista, rng)
+    # Se a temperatura for 100.0 (Estado Quente), aplicamos a partição estrutural estricta 7-4-4
+    if abs(temperatura - 100.0) < 1e-5:
+        bilhete = sortear_bilhete_estratificado_quente(pesos_lista, rng)
         jogos = [bilhete]
     else:
         if temperatura > 0.0:

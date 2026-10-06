@@ -85,7 +85,7 @@ export default function App() {
     let texto = `========================================\n LOTOFÁCIL IA v8.0 - REGISTRO DE JOGOS\n========================================\nOrigem: ${tipoOrigem}\nConcurso Alvo: ${numConcurso || "Indefinido"}\n\n`;
     texto += `[FRIO - T=0%]:   ${bilhetesObj.frio.map(dois).join(" - ")}\n`;
     texto += `[MORNO - T=50%]:  ${bilhetesObj.morno.map(dois).join(" - ")}\n`;
-    texto += `[QUENTE - T=100%]: ${bilhetesObj.quente.map(dois).join(" - ")}\n`;
+    texto += `[QUENTE - T=100% (7/4/4)]: ${bilhetesObj.quente.map(dois).join(" - ")}\n`;
     
     const blob = new Blob([texto], { type: "text/plain;charset=utf-8" });
     const link = document.createElement("a");
@@ -118,10 +118,10 @@ export default function App() {
                 🧊 <strong>Frio (T=0%):</strong> {porTemp?.espectro_frio?.conferidos || 0} jog. | Média: <strong>{porTemp?.espectro_frio?.media || 0}</strong> | 11+: {pct(porTemp?.espectro_frio?.taxa_11 || 0)}
               </div>
               <div style={{ padding: "6px", backgroundColor: "#fefce8", border: "1px solid #fef08a" }}>
-                🌤 <strong>Morno (T=50% - 7/4/4):</strong> {porTemp?.espectro_morno?.conferidos || 0} jog. | Média: <strong>{porTemp?.espectro_morno?.media || 0}</strong> | 11+: {pct(porTemp?.espectro_morno?.taxa_11 || 0)}
+                🌤 <strong>Morno (T=50% - Calculado):</strong> {porTemp?.espectro_morno?.conferidos || 0} jog. | Média: <strong>{porTemp?.espectro_morno?.media || 0}</strong> | 11+: {pct(porTemp?.espectro_morno?.taxa_11 || 0)}
               </div>
               <div style={{ padding: "6px", backgroundColor: "#fef2f2", border: "1px solid #fecaca" }}>
-                🔥 <strong>Quente (T=100%):</strong> {porTemp?.espectro_quente?.conferidos || 0} jog. | Média: <strong>{porTemp?.espectro_quente?.media || 0}</strong> | 11+: {pct(porTemp?.espectro_quente?.taxa_11 || 0)}
+                🔥 <strong>Quente (T=100% - 7/4/4):</strong> {porTemp?.espectro_quente?.conferidos || 0} jog. | Média: <strong>{porTemp?.espectro_quente?.media || 0}</strong> | 11+: {pct(porTemp?.espectro_quente?.taxa_11 || 0)}
               </div>
             </div>
           ) : (
@@ -144,13 +144,13 @@ export default function App() {
             <button onClick={() => handleDownloadTXT(resultadoGeracao.bilhetes, "Sorteio Ponderado", resultadoGeracao.concurso)} style={{ padding: "8px 16px", backgroundColor: "#15803d", color: "#fff", border: "none", borderRadius: "5px" }}>📥 Salvar TXT</button>
           </div>
           <p><strong>🧊 Frio:</strong> {resultadoGeracao.bilhetes.frio.map(dois).join(" - ")}</p>
-          <p><strong>🌤️ Morno (7/4/4):</strong> {resultadoGeracao.bilhetes.morno.map(dois).join(" - ")}</p>
-          <p><strong>🔥 Quente:</strong> {resultadoGeracao.bilhetes.quente.map(dois).join(" - ")}</p>
+          <p><strong>🌤️ Morno (Calculado):</strong> {resultadoGeracao.bilhetes.morno.map(dois).join(" - ")}</p>
+          <p><strong>🔥 Quente (7/4/4):</strong> {resultadoGeracao.bilhetes.quente.map(dois).join(" - ")}</p>
         </div>
       )}
 
       <div style={{ border: "1px solid #7c3aed", padding: "20px", borderRadius: "8px", backgroundColor: "#faf5ff" }}>
-        <h3>🧩 Gerador Automático de Desdobramento Espectral</h3>
+        <h3>🧩 Gerador Automático (Fechamento Fixo - 15 Dezenas)</h3>
         <button onClick={handleDesdobrarEspectro} disabled={loadingDesd} style={{ padding: "12px 24px", backgroundColor: "#4f46e5", color: "#fff", border: "none", borderRadius: "5px" }}>
           {loadingDesd ? "Calculando..." : "🧩 Gerar Desdobramento (Frio, Morno, Quente)"}
         </button>
@@ -163,8 +163,8 @@ export default function App() {
             <button onClick={() => handleDownloadTXT(resultadoDesd.bilhetes, "Desdobramento", resultadoDesd.concurso)} style={{ padding: "8px 16px", backgroundColor: "#6d28d9", color: "#fff", border: "none", borderRadius: "5px" }}>📥 Salvar TXT</button>
           </div>
           <p><strong>🧊 Frio:</strong> {resultadoDesd.bilhetes.frio.map(dois).join(" - ")}</p>
-          <p><strong>🌤️ Morno (8/5/4):</strong> {resultadoDesd.bilhetes.morno.map(dois).join(" - ")}</p>
-          <p><strong>🔥 Quente:</strong> {resultadoDesd.bilhetes.quente.map(dois).join(" - ")}</p>
+          <p><strong>🌤️ Morno (Calculado):</strong> {resultadoDesd.bilhetes.morno.map(dois).join(" - ")}</p>
+          <p><strong>🔥 Quente (7/4/4):</strong> {resultadoDesd.bilhetes.quente.map(dois).join(" - ")}</p>
         </div>
       )}
     </div>
