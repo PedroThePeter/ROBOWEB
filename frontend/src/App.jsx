@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const API_BASE = "https://roboweb-cvha.onrender.com";
+const API_URL = "http://localhost:8000";
 
 const pct = (v) => `${(v * 100).toFixed(1).replace(".", ",")}%`;
 const dois = (d) => String(d).padStart(2, "0");
