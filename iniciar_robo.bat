@@ -1,38 +1,49 @@
 @echo off
+:: Garante que o script execute estritamente na pasta onde esta salvo
+cd /d "%~dp0"
+
 title Laboratorio do Robo Lotofacil V8.1
 color 0A
 
 echo ========================================================
-echo   Inicializando o Robo da Lotofacil (Modo 100%% Local)
-echo   Ambiente: V8.1 (5 Juizes e 3 Curadores)
+echo   Iniciando o Robo da Lotofacil (Modo 100%% Local)
 echo ========================================================
 echo.
 
-:: 1. Ativa o ambiente virtual e inicia a API (Backend) em janela minimizada
-echo [1/3] Acordando os Curadores e Juizes (Backend API)...
-start "Backend API" /min cmd /c ".\venv\Scripts\activate && python main.py"
+:: 1. Verifica se o ambiente virtual existe
+if not exist "venv\Scripts\activate.bat" (
+    echo [ERRO CRITICO] O ambiente virtual 'venv' nao foi encontrado!
+    echo Certifique-se de que este arquivo esta na pasta correta.
+    pause
+    exit /b
+)
 
-:: Aguarda 3 segundos para o servidor Python estabilizar
-timeout /t 3 /nobreak > NUL
+:: 2. Inicia o Backend Python em uma janela separada e mantem aberta se houver erro
+echo [1/2] Iniciando o Backend FastAPI (Python na porta 8000)...
+start "Backend API - Lotofacil" cmd /k "call venv\Scripts\activate && python main.py"
 
-:: 2. Inicia o painel visual (Frontend React) em janela minimizada
-echo [2/3] Ligando o Painel de Controle Visual (Frontend React)...
-start "Frontend React" /min cmd /c "cd frontend && npm run dev"
-
-:: Aguarda 4 segundos para o servidor Vite compilar a interface
+:: Aguarda 4 segundos para o servidor Python estabilizar a porta 8000
 timeout /t 4 /nobreak > NUL
 
-:: 3. Abre o navegador padrão diretamente no sistema
-echo [3/3] Abrindo o seu Laboratorio no Navegador...
+:: 3. Inicia o Frontend React em outra janela separada
+echo [2/2] Iniciando o Painel React (Vite na porta 5173)...
+if not exist "frontend" (
+    echo [ERRO] A pasta 'frontend' nao foi encontrada!
+    pause
+    exit /b
+)
+start "Frontend React - Lotofacil" cmd /k "cd frontend && npm run dev"
+
+:: Aguarda 3 segundos para o painel compilar
+timeout /t 3 /nobreak > NUL
+
+:: 4. Abre o navegador automaticamente
+echo Abrindo o navegador no painel local...
 start http://localhost:5173
 
 echo.
 echo ========================================================
-echo [ OK ] Sistema iniciado e operante!
-echo O robo ja esta aberto no seu navegador.
+echo   Automatizacao concluida com sucesso!
+echo   Deixe as duas janelas pretas abertas em segundo plano.
 echo ========================================================
-echo.
-echo As engrenagens (terminais) estao rodando minimizadas.
-echo Quando terminar de usar, basta fechar as janelas pretas abertas na barra de tarefas.
-echo.
 pause

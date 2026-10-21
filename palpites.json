@@ -26,7 +26,9 @@
         "2cf3640a64b498967f145afe46cd02607ed4ca8226b554e84c8316ce2db29ed2"
       ],
       "origem": "espectro_frio",
-      "acertos": []
+      "acertos": [
+        9
+      ]
     },
     {
       "concurso": 3809,
@@ -54,7 +56,9 @@
         "d251a2f1287a6e678cc4ba2cd4232a9daeea9cc451bad711ed5f3889b20c7b51"
       ],
       "origem": "espectro_morno",
-      "acertos": []
+      "acertos": [
+        8
+      ]
     },
     {
       "concurso": 3809,
@@ -82,7 +86,9 @@
         "d28be798ec2aed7b822b8ebdc40d27d9cc8661cb778ea44744afb7a4ffec53f0"
       ],
       "origem": "espectro_quente",
-      "acertos": []
+      "acertos": [
+        9
+      ]
     }
   ],
   "ultimos_palpites": [
