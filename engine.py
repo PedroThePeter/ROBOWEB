@@ -1,161 +1,177 @@
-import math
-import secrets
-from collections import Counter
-from typing import Dict, List, Optional, Sequence
+import random
 
-from integridade import carregar_pesos_para_engine, _hash_bilhete, PESOS_PADRAO
-
-DEZENAS = list(range(1, 26))
-TAMANHO_BILHETE = 15
-QUANTIDADE_MAXIMA = 100
-
-AVISO = (
-    "Os sorteios da Lotofácil são aleatórios: estes bilhetes não têm mais chance "
-    "de acertar do que quaisquer outros de 15 dezenas. "
-    "[PIPELINE DE CURADORIA ATIVADA]"
-)
+AVISO = "Operando na V9.0 (20 Juízes e Curadores em Escala). Modo 100% Local."
+PLANILHA_PADRAO = "Lotofacil.xlsx"
 
 # ==========================================
-# ⚖️ OS NOVOS JUÍZES (Filtros Heurísticos)
+# ⚖️ MÓDULO A, B e C: OS 15 JUÍZES HEURÍSTICOS
 # ==========================================
-def juiz_paridade(bilhete: List[int]) -> bool:
-    pares = sum(1 for x in bilhete if x % 2 == 0)
-    return 6 <= pares <= 9
-
-def juiz_soma(bilhete: List[int]) -> bool:
-    return 160 <= sum(bilhete) <= 210
-
-def juiz_dispersao(bilhete: List[int]) -> bool:
-    linhas = len(set((x - 1) // 5 for x in bilhete))
-    colunas = len(set((x - 1) % 5 for x in bilhete))
-    return linhas >= 4 and colunas >= 3
+def _juiz_paridade(b): return 6 <= sum(1 for x in b if x % 2 == 0) <= 9
+def _juiz_soma(b): return 160 <= sum(b) <= 210
+def _juiz_primos(b): 
+    primos = {2, 3, 5, 7, 11, 13, 17, 19, 23}
+    return 4 <= sum(1 for x in b if x in primos) <= 7
+def _juiz_fibonacci(b): 
+    fib = {1, 2, 3, 5, 8, 13, 21}
+    return 3 <= sum(1 for x in b if x in fib) <= 6
+def _juiz_mult3(b): return 3 <= sum(1 for x in b if x % 3 == 0) <= 6
+def _juiz_moldura(b): 
+    moldura = {1, 2, 3, 4, 5, 6, 10, 11, 15, 16, 20, 21, 22, 23, 24, 25}
+    return 8 <= sum(1 for x in b if x in moldura) <= 11
+def _juiz_amplitude(b): return b[0] <= 5 and b[-1] >= 21
+def _juiz_terminais(b):
+    from collections import Counter
+    counts = Counter([x % 10 for x in b]).values()
+    return all(v <= 4 for v in counts) # Máximo 4 números terminados no mesmo dígito
+def _juiz_linhas(b):
+    for r in range(5):
+        qtd = sum(1 for x in b if (r*5 + 1) <= x <= (r*5 + 5))
+        if qtd == 0 or qtd == 5: return False
+    return True
+def _juiz_colunas(b):
+    for c in range(1, 6):
+        qtd = sum(1 for x in b if (x - c) % 5 == 0)
+        if qtd == 0 or qtd == 5: return False
+    return True
+def _juiz_diagonais(b):
+    diag = {1, 7, 13, 19, 25, 5, 9, 17, 21}
+    return 3 <= sum(1 for x in b if x in diag) <= 7
+def _juiz_consecutividade(b):
+    max_cons = 1; curr_cons = 1
+    for i in range(1, 15):
+        if b[i] == b[i-1] + 1:
+            curr_cons += 1
+            if curr_cons > max_cons: max_cons = curr_cons
+        else:
+            curr_cons = 1
+    return max_cons <= 5
+def _juiz_gaps(b):
+    max_gap = 0
+    for i in range(1, 15):
+        gap = b[i] - b[i-1] - 1
+        if gap > max_gap: max_gap = gap
+    return max_gap <= 6
+def _juiz_retencao(b, sorteios):
+    if not sorteios: return True
+    ult = sorteios[-1]
+    return 7 <= sum(1 for x in b if x in ult) <= 10
+def _juiz_frias(b, sorteios):
+    if not sorteios or len(sorteios) < 3: return True
+    saidos = set(sorteios[-1]) | set(sorteios[-2]) | set(sorteios[-3])
+    frias = set(range(1, 26)) - saidos
+    if len(frias) >= 1:
+        return sum(1 for x in b if x in frias) <= 3
+    return True
 
 # ==========================================
-# 🧠 OS CURADORES DE CÓDIGO
+# 🎛️ CAMADA 1: CURADOR DE MICROANÁLISE
 # ==========================================
-def curador_microanalise(gerador_func, max_tentativas=500):
-    """Curador 1: Submete os bilhetes aos 3 juízes individualmente."""
-    for _ in range(max_tentativas):
-        bilhete = gerador_func()
-        if juiz_paridade(bilhete) and juiz_soma(bilhete) and juiz_dispersao(bilhete):
-            return bilhete, True
-    return gerador_func(), False
+def curador_1_aprova_bilhete(b, sorteios):
+    if not _juiz_paridade(b): return False
+    if not _juiz_soma(b): return False
+    if not _juiz_primos(b): return False
+    if not _juiz_fibonacci(b): return False
+    if not _juiz_mult3(b): return False
+    if not _juiz_moldura(b): return False
+    if not _juiz_amplitude(b): return False
+    if not _juiz_terminais(b): return False
+    if not _juiz_linhas(b): return False
+    if not _juiz_colunas(b): return False
+    if not _juiz_diagonais(b): return False
+    if not _juiz_consecutividade(b): return False
+    if not _juiz_gaps(b): return False
+    if not _juiz_retencao(b, sorteios): return False
+    if not _juiz_frias(b, sorteios): return False
+    return True
 
-def curador_diversidade(frio: List[int], morno: List[int], quente: List[int]):
-    """Curador 2: Analisa a diversidade do portfólio em conjunto."""
-    i1 = len(set(frio) & set(morno))
-    i2 = len(set(frio) & set(quente))
-    i3 = len(set(morno) & set(quente))
-    maior_sobreposicao = max(i1, i2, i3)
+# ==========================================
+# 🔄 ALGORITMOS DE SELEÇÃO
+# ==========================================
+def pesos_por_frequencia(sorteios):
+    frequencias = {str(i): 0 for i in range(1, 26)}
+    if not sorteios: return {k: 1.0 for k in frequencias}
+    for s in sorteios:
+        for num in s: frequencias[str(num)] += 1
+    total = len(sorteios)
+    return {k: (v / total if total > 0 else 0) for k, v in frequencias.items()}
+
+def _escolher_15_roleta(lista_pesos, temperatura):
+    import secrets
+    rng = secrets.SystemRandom()
+    peso_medio = sum(lista_pesos) / len(lista_pesos) if lista_pesos else 1.0
     
-    if maior_sobreposicao > 11:
-        return False, f"Curador 2 Reprovou: Sobreposição excessiva ({maior_sobreposicao} dezenas repetidas entre tickets)."
-    return True, f"Curador 2 Aprovou: Diversidade máxima cruzada garantida (Max {maior_sobreposicao} interseções)."
+    if temperatura == 0.0:
+        # Micro-ruído térmico para evitar loop infinito nos juízes estritos
+        pesos = [p + (rng.random() * p * 0.1) for p in lista_pesos]
+    elif temperatura == 50.0:
+        pesos = [p * 0.5 + peso_medio * 0.5 for p in lista_pesos]
+    else:
+        pesos = [1.0 for _ in lista_pesos]
+        
+    populacao = list(range(1, 26))
+    escolhidos = []
+    for _ in range(15):
+        idx = rng.choices(range(len(populacao)), weights=pesos, k=1)[0]
+        escolhidos.append(populacao.pop(idx))
+        pesos.pop(idx)
+    return sorted(escolhidos)
 
-def extrair_pesos_dict(pesos_input):
-    if isinstance(pesos_input, tuple):
-        return pesos_input[0]
-    return pesos_input
-
-def _pesos_por_dezena(pesos: Dict) -> List[float]:
-    lista = []
-    for d in DEZENAS:
-        bruto = pesos.get(str(d), pesos.get(d, 1.0))
-        try:
-            v = float(bruto)
-        except (TypeError, ValueError):
-            v = 0.0
-        lista.append(v if math.isfinite(v) and v > 0 else 0.0)
-    return lista
-
-def sortear_bilhete_estratificado_quente(pesos_lista: Sequence[float], rng=None) -> List[int]:
-    """Mantém a geometria estrita 7-4-4 do Bilhete Quente (T=100%)"""
-    rng = rng or secrets.SystemRandom()
-    faixa1 = list(range(1, 12))
-    faixa2 = list(range(12, 19))
-    faixa3 = list(range(19, 26))
-
+def _escolher_15_geometria(lista_pesos, temperatura):
+    import secrets
+    rng = secrets.SystemRandom()
+    peso_medio = sum(lista_pesos) / len(lista_pesos) if lista_pesos else 1.0
+    
+    if temperatura == 0.0:
+        pesos = [p + (rng.random() * p * 0.1) for p in lista_pesos]
+    elif temperatura == 50.0:
+        pesos = [p * 0.5 + peso_medio * 0.5 for p in lista_pesos]
+    else:
+        pesos = [1.0 for _ in lista_pesos]
+        
     def escolher_da_faixa(faixa, k):
         sub_pop = list(faixa)
-        sub_pesos = [pesos_lista[d - 1] for d in sub_pop]
-        escolhidos = []
+        sub_pesos = [pesos[d - 1] for d in sub_pop]
+        esc = []
         for _ in range(k):
-            if sum(sub_pesos) <= 0:
-                idx = rng.randrange(len(sub_pop))
-            else:
-                idx = rng.choices(range(len(sub_pop)), weights=sub_pesos, k=1)[0]
-            escolhidos.append(sub_pop.pop(idx))
+            if sum(sub_pesos) <= 0: idx = rng.randrange(len(sub_pop))
+            else: idx = rng.choices(range(len(sub_pop)), weights=sub_pesos, k=1)[0]
+            esc.append(sub_pop.pop(idx))
             sub_pesos.pop(idx)
-        return escolhidos
+        return esc
 
-    b1 = escolher_da_faixa(faixa1, 7)
-    b2 = escolher_da_faixa(faixa2, 4)
-    b3 = escolher_da_faixa(faixa3, 4)
-    return sorted(b1 + b2 + b3)
+    return sorted(escolher_da_faixa(range(1, 12), 7) + 
+                  escolher_da_faixa(range(12, 19), 4) + 
+                  escolher_da_faixa(range(19, 26), 4))
 
-def pesos_por_frequencia(sorteios: Sequence[Sequence[int]], janela: Optional[int] = None) -> Dict[str, float]:
-    recentes = sorteios[-janela:] if janela else sorteios
-    cont = Counter(d for s in recentes for d in s)
-    return {str(d): float(cont.get(d, 0) + 1) for d in DEZENAS}
-
-class LotofacilGeneticEngine:
-    def __init__(self, caminho_pesos=None):
-        self.caminho_pesos = caminho_pesos
-
-    def gerar_jogos(self, quantidade=1, concurso=None, pesos=None, temperatura=0.0):
-        return gerar_jogos_genetico(quantidade, concurso, self.caminho_pesos, pesos, temperatura)
-
-def gerar_jogos_genetico(quantidade=1, concurso=None, caminho_pesos=None, pesos=None, rng=None, temperatura=0.0):
-    if not isinstance(quantidade, int) or not (1 <= quantidade <= QUANTIDADE_MAXIMA):
-        raise ValueError(f"quantidade deve ser um inteiro entre 1 e {QUANTIDADE_MAXIMA}.")
-    
-    rng = rng or secrets.SystemRandom()
-
-    if pesos is not None:
-        pesos_dict, valido = pesos, False
-    else:
-        pesos_dict, valido = carregar_pesos_para_engine(caminho_pesos)
-
-    pesos_lista = _pesos_por_dezena(extrair_pesos_dict(pesos_dict))
-
-    def gerador_temperatura():
-        if abs(temperatura - 100.0) < 1e-5:
-            return sortear_bilhete_estratificado_quente(pesos_lista, rng)
-        else:
-            p_lista = list(pesos_lista)
-            if temperatura > 0.0:
-                t_norm = max(0.0, min(temperatura, 100.0)) / 100.0
-                if p_lista:
-                    peso_medio = sum(p_lista) / len(p_lista)
-                    p_lista = [p * (1.0 - t_norm) + (peso_medio * t_norm) for p in p_lista]
-
-            if sum(1 for p in p_lista if p > 0) < TAMANHO_BILHETE:
-                return sorted(rng.sample(DEZENAS, TAMANHO_BILHETE))
-
-            populacao = list(DEZENAS)
-            restantes = list(p_lista)
-            bilhete = []
-            for _ in range(TAMANHO_BILHETE):
-                i = rng.choices(range(len(populacao)), weights=restantes, k=1)[0]
-                bilhete.append(populacao.pop(i))
-                restantes.pop(i)
-            return sorted(bilhete)
-
-    jogos = []
+def gerar_jogos_genetico(quantidade, concurso, pesos, temperatura, sorteios=None):
+    lista_pesos = [float(pesos.get(str(i), 1.0)) for i in range(1, 26)]
+    bilhetes_validos = []
     for _ in range(quantidade):
-        bilhete, _ = curador_microanalise(gerador_temperatura)
-        jogos.append(bilhete)
+        aprovado = False
+        tentativas = 0
+        while not aprovado and tentativas < 30000:
+            tentativas += 1
+            if temperatura >= 100.0:
+                b = _escolher_15_geometria(lista_pesos, temperatura)
+            else:
+                b = _escolher_15_roleta(lista_pesos, temperatura)
+                
+            if curador_1_aprova_bilhete(b, sorteios):
+                aprovado = True
+                bilhetes_validos.append(b)
+        if not aprovado:
+            bilhetes_validos.append(b) # Fallback extremo
+    return {"bilhetes": bilhetes_validos}
 
-    hashes = [_hash_bilhete(b) for b in jogos]
-
-    return {
-        "status": "sucesso",
-        "concurso": concurso,
-        "quantidade": len(jogos),
-        "jogos": jogos,
-        "bilhetes": jogos,
-        "hashes": hashes,
-        "trava_valida": valido,
-        "aviso": AVISO,
-        "temperatura_aplicada": temperatura
-    }
+# ==========================================
+# 🔀 CAMADA 2: MACROCURADORIA E PORTFÓLIO
+# ==========================================
+def curador_diversidade(frio, morno, quente):
+    todas = set(frio + morno + quente)
+    # Curador 16: Cobertura Global
+    if len(todas) < 20: return False, "Baixa cobertura global"
+    # Curador 17 e 18: Interseção e Simetria
+    if len(set(frio) & set(morno)) > 11: return False, "Frio e Morno similares"
+    if len(set(frio) & set(quente)) > 11: return False, "Frio e Quente similares"
+    if len(set(morno) & set(quente)) > 11: return False, "Morno e Quente similares"
+    return True, "Portfólio aprovado"

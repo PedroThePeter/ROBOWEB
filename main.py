@@ -15,15 +15,11 @@ from dados import carregar_sorteios
 PLANILHA_PADRAO = "Lotofacil.xlsx"
 
 app = FastAPI(
-    title="Robô Lotofácil V8.1 - Ambiente 100% Local",
-    description="API REST Local para auditoria, geração de bilhetes e conferência da Lotofácil (Pipeline v8.1)",
-    version="8.1"
+    title="Robô Lotofácil V9.0 - Inteligência de Múltiplos Agentes",
+    description="API REST Local para auditoria com 20 Juízes e Curadores (Pipeline v9.0)",
+    version="9.0"
 )
 
-# ==========================================
-# 🔒 SEGURANÇA LOCAL (CORS)
-# Restringe o acesso exclusivamente à sua máquina (localhost)
-# ==========================================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -39,10 +35,8 @@ app.add_middleware(
 
 _cache = {"base": None}
 
-
 def _caminho_planilha() -> str:
     return os.environ.get("PLANILHA", PLANILHA_PADRAO)
-
 
 def _obter_proximo_concurso() -> Optional[int]:
     caminho = _caminho_planilha()
@@ -51,7 +45,6 @@ def _obter_proximo_concurso() -> Optional[int]:
     try:
         xls = pd.ExcelFile(caminho)
         df = pd.read_excel(xls, sheet_name=0)
-        
         coluna_concurso = None
         for col in df.columns:
             if str(col).strip().lower() in ['concurso', 'nº concurso', 'bolão', 'concorrencia']:
@@ -61,21 +54,17 @@ def _obter_proximo_concurso() -> Optional[int]:
             coluna_concurso = df.columns[0]
             
         if coluna_concurso is not None:
-            ultimo_concurso = int(df[coluna_concurso].dropna().iloc[-1])
-            return ultimo_concurso + 1
+            return int(df[coluna_concurso].dropna().iloc[-1]) + 1
             
         sorteios = carregar_sorteios(caminho)
-        if sorteios:
-            return len(sorteios) + 1
+        if sorteios: return len(sorteios) + 1
     except Exception:
         try:
             sorteios = carregar_sorteios(caminho)
-            if sorteios:
-                return len(sorteios) + 1
+            if sorteios: return len(sorteios) + 1
         except Exception:
             pass
     return None
-
 
 def _resumo_memoria(sorteios) -> dict:
     am = analise_memoria
@@ -88,34 +77,24 @@ def _resumo_memoria(sorteios) -> dict:
         "achado": abs(z) > lim,
         "detalhe": f"maior desvio: dezena {dezena:02d}, z = {z:+.2f} (limite {lim:.2f})",
     })
-    achados = sum(1 for t in testes if t["achado"])
-    conclusao = "Base estatística mapeada. Sem anomalias severas fora da curva padrão."
-    return {"testes": testes, "achados": achados, "total_testes": len(testes), "conclusao": conclusao}
-
+    return {"testes": testes, "achados": sum(1 for t in testes if t["achado"]), "total_testes": len(testes), "conclusao": "Base mapeada e operante."}
 
 def _montar_base() -> dict:
     caminho = _caminho_planilha()
-    if not os.path.exists(caminho):
-        return {"disponivel": False, "mensagem": f"Planilha '{caminho}' não encontrada no servidor local."}
+    if not os.path.exists(caminho): return {"disponivel": False, "mensagem": "Planilha ausente."}
     try:
         sorteios = carregar_sorteios(caminho)
     except Exception as e:
-        return {"disponivel": False, "mensagem": f"Não consegui ler a planilha: {e}"}
-
+        return {"disponivel": False, "mensagem": str(e)}
     base = {"disponivel": True, "concursos": len(sorteios), "memoria": None}
-    if len(sorteios) >= 100:
-        base["memoria"] = _resumo_memoria(sorteios)
+    if len(sorteios) >= 100: base["memoria"] = _resumo_memoria(sorteios)
     return base
 
-
 def _desempenho() -> dict:
-    try:
-        historico = diario.obter_dados_diario()["historico"]
-    except Exception:
-        historico = []
+    try: historico = diario.obter_dados_diario()["historico"]
+    except Exception: historico = []
 
     acertos_geral = [a for r in historico for a in r.get("acertos", [])]
-    
     desempenho_por_origem = {}
     for origem in ["espectro_frio", "espectro_morno", "espectro_quente"]:
         acertos_origem = [a for r in historico if r.get("origem") == origem for a in r.get("acertos", [])]
@@ -141,12 +120,10 @@ def _desempenho() -> dict:
         "por_temperatura": desempenho_por_origem
     }
 
-
 @app.get("/api/estatisticas")
 def api_estatisticas():
     try:
-        if _cache["base"] is None:
-            _cache["base"] = _montar_base()
+        if _cache["base"] is None: _cache["base"] = _montar_base()
         _, trava_valida = integridade.carregar_pesos_para_engine()
         return {
             "status": "sucesso",
@@ -158,31 +135,22 @@ def api_estatisticas():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.post("/api/recarregar-base")
 def api_recarregar_base():
     try:
         caminho = _caminho_planilha()
-        try:
-            diario.conferir_resultados(caminho)
-        except Exception:
-            pass
-
+        try: diario.conferir_resultados(caminho)
+        except Exception: pass
         _cache["base"] = _montar_base()
         _, valido = integridade.carregar_pesos_para_engine()
-
         proximo = _obter_proximo_concurso()
-        mensagem = f"Planilha relida. Conferência térmica executada. Próximo alvo: {proximo}."
         return {
-            "status": "sucesso",
-            "sucesso": True,
-            "mensagem": mensagem,
-            "trava_valida": valido,
-            "proximo_concurso": proximo,
+            "status": "sucesso", "sucesso": True,
+            "mensagem": f"Planilha relida. Conferência térmica executada. Próximo alvo: {proximo}.",
+            "trava_valida": valido, "proximo_concurso": proximo,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.post("/api/gerar-jogos")
 def api_gerar_jogos():
@@ -192,7 +160,7 @@ def api_gerar_jogos():
         pesos_dict = engine.pesos_por_frequencia(sorteios)
         concurso_alvo = _obter_proximo_concurso() or (len(sorteios) + 1)
 
-        # Curador 2 (Diversidade de Portfólio) - Loop de aprovação cruzada
+        # Curador 2 (Diversidade de Portfólio Transversal)
         portfolio_aprovado = False
         tentativas_c2 = 0
         b_frio, b_morno, b_quente = [], [], []
@@ -200,20 +168,19 @@ def api_gerar_jogos():
         while not portfolio_aprovado and tentativas_c2 < 20:
             tentativas_c2 += 1
             
-            # Curador 1: Geração submetida aos 5 Juízes Heurísticos
-            res_frio = engine.gerar_jogos_genetico(1, concurso=concurso_alvo, pesos=pesos_dict, temperatura=0.0)
-            res_morno = engine.gerar_jogos_genetico(1, concurso=concurso_alvo, pesos=pesos_dict, temperatura=50.0)
-            res_quente = engine.gerar_jogos_genetico(1, concurso=concurso_alvo, pesos=pesos_dict, temperatura=100.0)
+            # Geração submetida aos 15 Juízes internos (Camada 1)
+            res_frio = engine.gerar_jogos_genetico(1, concurso_alvo, pesos_dict, 0.0, sorteios)
+            res_morno = engine.gerar_jogos_genetico(1, concurso_alvo, pesos_dict, 50.0, sorteios)
+            res_quente = engine.gerar_jogos_genetico(1, concurso_alvo, pesos_dict, 100.0, sorteios)
 
             b_frio = res_frio["bilhetes"][0]
             b_morno = res_morno["bilhetes"][0]
             b_quente = res_quente["bilhetes"][0]
 
             aprovado, _ = engine.curador_diversidade(b_frio, b_morno, b_quente)
-            if aprovado:
-                portfolio_aprovado = True
+            if aprovado: portfolio_aprovado = True
 
-        # Curador 3 (Gatekeeper) e Persistência no Diário com Hashes Criptográficos
+        # Curadores Gatekeeper (Hashes e Persistência Segura)
         hash_frio = integridade._hash_bilhete(b_frio)
         hash_morno = integridade._hash_bilhete(b_morno)
         hash_quente = integridade._hash_bilhete(b_quente)
@@ -222,21 +189,14 @@ def api_gerar_jogos():
         diario.salvar_palpites({"concurso": concurso_alvo, "quantidade": 1, "jogos": [b_morno], "hashes": [hash_morno]}, origem="espectro_morno")
         diario.salvar_palpites({"concurso": concurso_alvo, "quantidade": 1, "jogos": [b_quente], "hashes": [hash_quente]}, origem="espectro_quente")
 
-        bilhetes_resp = {
-            "frio": b_frio,
-            "morno": b_morno,
-            "quente": b_quente
-        }
-
         return {
             "status": "sucesso",
             "concurso": concurso_alvo,
             "curador_2_tentativas": tentativas_c2,
-            "bilhetes": bilhetes_resp
+            "bilhetes": {"frio": b_frio, "morno": b_morno, "quente": b_quente}
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 if __name__ == "__main__":
     import uvicorn
