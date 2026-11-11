@@ -40,18 +40,13 @@ def gerar_jogos():
     sorteios = carregar_sorteios(caminho)
     alvo = _proximo_concurso(sorteios)
 
-    # Curador 10: Gatekeeper do Diário (Bloqueia Duplicidade)
-    hist = diario.obter_dados_diario().get("historico", [])
-    if any(r.get("concurso") == alvo for r in hist):
-        raise HTTPException(status_code=400, detail=f"Curador 10: Concurso {alvo} já gerado no diário.")
-
     # Geração via pipeline (Curadores 1 a 7 dentro do engine)
     frio, morno, quente = engine.gerar_portfolio(sorteios)
 
     # Curador 8: Gatekeeper SHA-256
     hf, hm, hq = integridade._hash_bilhete(frio), integridade._hash_bilhete(morno), integridade._hash_bilhete(quente)
 
-    # Gravação via Curador 10
+    # Curador 10: Gravação livre no diário (sem bloqueio de duplicidade para o Mestre)
     diario.salvar_palpites({"concurso": alvo, "quantidade": 1, "jogos": [frio], "hashes": [hf]}, origem="espectro_frio")
     diario.salvar_palpites({"concurso": alvo, "quantidade": 1, "jogos": [morno], "hashes": [hm]}, origem="espectro_morno")
     diario.salvar_palpites({"concurso": alvo, "quantidade": 1, "jogos": [quente], "hashes": [hq]}, origem="espectro_quente")
