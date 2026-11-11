@@ -1736,7 +1736,9 @@
         "117e40058773e4b6fd2cd8572f17968cb0ba9be5353b0f54946dffdf239f2574"
       ],
       "origem": "espectro_frio",
-      "acertos": []
+      "acertos": [
+        8
+      ]
     },
     {
       "concurso": 3820,
@@ -1764,7 +1766,9 @@
         "16f817d29260b6336833dbfd1d478520dcf7453d457a5fe2b605d615d527f571"
       ],
       "origem": "espectro_morno",
-      "acertos": []
+      "acertos": [
+        10
+      ]
     },
     {
       "concurso": 3820,
@@ -1792,42 +1796,192 @@
         "cefd0e09866e5e2ab6a5fdc9ef1a0bd2223588b141692e533c19603e5069ad4a"
       ],
       "origem": "espectro_quente",
-      "acertos": []
-    }
-  ],
-  "ultimos_palpites": [
+      "acertos": [
+        6
+      ]
+    },
     {
-      "concurso": 3815,
+      "concurso": 3821,
       "quantidade": 1,
       "jogos": [
         [
+          2,
           3,
           4,
           5,
           7,
-          8,
+          10,
           11,
           12,
           14,
-          15,
-          17,
+          16,
           18,
+          19,
+          20,
+          21,
+          23
+        ]
+      ],
+      "hashes": [
+        "62b11aa9584d7523485f4a1edd36e636af2c925bd79087ac7ba6aa172f13dd7e"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3821,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          4,
+          5,
+          6,
+          7,
+          10,
+          11,
+          13,
+          15,
+          16,
+          18,
+          19,
           22,
+          25
+        ]
+      ],
+      "hashes": [
+        "3e3070c183fe6878bb84a15a211e43125d80b42451150ee0f78ce13750c23c4f"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3821,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          3,
+          4,
+          5,
+          7,
+          9,
+          10,
+          12,
+          13,
+          14,
+          16,
+          20,
+          22,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "e9b3e275518d8ac5320da7ac2261f71b36d190b4db8740bebad496995d559636"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3822,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          4,
+          5,
+          7,
+          8,
+          9,
+          10,
+          12,
+          13,
+          16,
+          21,
           23,
           24,
           25
         ]
       ],
       "hashes": [
-        "87fd33631a47e2984e5845983ee73c0f156fb361377bbc2ce9a1bccb301f4b16"
+        "ff9673986233939d60510be04b3e22fd9e50df160e62268b078b05037ba664b9"
       ],
-      "origem": "espectro_morno",
+      "origem": "espectro_frio",
       "acertos": [
-        9
+        10
       ]
     },
     {
-      "concurso": 3815,
+      "concurso": 3822,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          3,
+          4,
+          5,
+          6,
+          7,
+          14,
+          15,
+          17,
+          18,
+          20,
+          21,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "0974cf2b33d64e097ccdafe203df4a0b575ea63d843b37f6438dab3976972ac4"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3822,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          6,
+          8,
+          9,
+          11,
+          13,
+          15,
+          17,
+          18,
+          20,
+          21,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "6e31716c164963265dd5ba4e97a524fe551ff85ba2fed76d24fdec1106cf64cf"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3823,
       "quantidade": 1,
       "jogos": [
         [
@@ -1835,291 +1989,171 @@
           3,
           5,
           6,
-          8,
           9,
-          10,
-          12,
+          11,
+          13,
           14,
           15,
-          17,
+          16,
+          19,
+          21,
           22,
-          23,
           24,
           25
         ]
       ],
       "hashes": [
-        "fc60bb23ffdceeed813990fff76627714aecacca8cd072fdda245e38d5686ab0"
+        "f097e7b26b85b6077006161feab2f4b9d4a29f61c176fd69e47ad29d861c99b0"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3823,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          7,
+          8,
+          10,
+          11,
+          12,
+          13,
+          15,
+          18,
+          20,
+          21,
+          24
+        ]
+      ],
+      "hashes": [
+        "e31363dc7703cc3b04d0159fd27a7262436fb9400a27cf3d6752868cff924308"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3823,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          6,
+          8,
+          9,
+          12,
+          13,
+          16,
+          18,
+          20,
+          21,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "8bc6205c84eba8aac2ea964ab2a678c6e1ede7ffcc193cb89f641def06db1d7d"
       ],
       "origem": "espectro_quente",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3825,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          5,
+          6,
+          9,
+          11,
+          12,
+          13,
+          14,
+          16,
+          17,
+          18,
+          21,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "a647e8a4965cee1b0e87d35da9e18cb51d2e73fd8eb3077ab31d2da80fba97f1"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        7
+      ]
+    },
+    {
+      "concurso": 3825,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          4,
+          5,
+          6,
+          7,
+          9,
+          10,
+          11,
+          14,
+          15,
+          17,
+          18,
+          20,
+          22
+        ]
+      ],
+      "hashes": [
+        "84ed72a90630225f666525cedf79f072711c1f0eb170d8ee222cd59c2274bc71"
+      ],
+      "origem": "espectro_morno",
       "acertos": [
         11
       ]
     },
     {
-      "concurso": 3815,
+      "concurso": 3825,
       "quantidade": 1,
       "jogos": [
         [
           2,
-          3,
-          5,
+          4,
+          6,
+          7,
           8,
-          9,
           10,
           11,
           13,
-          16,
-          17,
-          18,
-          20,
-          22,
-          23,
-          24
-        ]
-      ],
-      "hashes": [
-        "4ae9340912966d8f0b1e2018159af9ec0b8773b63ae4058e6042aef23dcad3a3"
-      ],
-      "origem": "espectro_frio",
-      "acertos": [
-        9
-      ]
-    },
-    {
-      "concurso": 3815,
-      "quantidade": 1,
-      "jogos": [
-        [
-          2,
-          5,
-          6,
-          7,
-          9,
-          10,
-          12,
-          13,
-          14,
           15,
-          17,
+          16,
           18,
+          19,
           21,
-          23,
-          24
-        ]
-      ],
-      "hashes": [
-        "49dfa66e606172a4af53babc92d23a9255dcde082836ab4b14cb258396666b4c"
-      ],
-      "origem": "espectro_morno",
-      "acertos": [
-        10
-      ]
-    },
-    {
-      "concurso": 3815,
-      "quantidade": 1,
-      "jogos": [
-        [
-          1,
-          3,
-          4,
-          5,
-          7,
-          8,
-          9,
-          13,
-          16,
-          17,
-          18,
-          19,
-          20,
-          23,
-          24
-        ]
-      ],
-      "hashes": [
-        "c6d8cb27a64902efc61a8bf6a51d17acd2f3fdc5bd7163c72ff2e8cfa3021e0b"
-      ],
-      "origem": "espectro_quente",
-      "acertos": [
-        8
-      ]
-    },
-    {
-      "concurso": 3815,
-      "quantidade": 1,
-      "jogos": [
-        [
-          2,
-          4,
-          6,
-          7,
-          9,
-          10,
-          14,
-          15,
-          16,
-          17,
-          19,
-          20,
-          22,
           24,
           25
         ]
       ],
       "hashes": [
-        "5091fe43cb5f67cd0fe5eab6cf3f09b37197633fe1b7a102d324aca8a4132ec8"
-      ],
-      "origem": "espectro_frio",
-      "acertos": [
-        9
-      ]
-    },
-    {
-      "concurso": 3815,
-      "quantidade": 1,
-      "jogos": [
-        [
-          2,
-          4,
-          7,
-          8,
-          10,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          19,
-          20,
-          21,
-          24
-        ]
-      ],
-      "hashes": [
-        "d9c598330af4052d670d512043e549e3c1296f7a82d4b7c880cc3030a6f19742"
-      ],
-      "origem": "espectro_morno",
-      "acertos": [
-        8
-      ]
-    },
-    {
-      "concurso": 3815,
-      "quantidade": 1,
-      "jogos": [
-        [
-          4,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          13,
-          14,
-          16,
-          17,
-          21,
-          22,
-          24,
-          25
-        ]
-      ],
-      "hashes": [
-        "38c276a564a35b84fd5d5d8621fe38ce2db44bb5129e27664b54b38deabfac44"
-      ],
-      "origem": "espectro_quente",
-      "acertos": [
-        9
-      ]
-    },
-    {
-      "concurso": 3816,
-      "quantidade": 1,
-      "jogos": [
-        [
-          1,
-          3,
-          4,
-          5,
-          6,
-          7,
-          10,
-          11,
-          13,
-          15,
-          16,
-          18,
-          21,
-          22,
-          25
-        ]
-      ],
-      "hashes": [
-        "5909e5501d5754161acf4371cd5f679e45ddab8dedd81729a75b86c8c38a4041"
-      ],
-      "origem": "espectro_frio",
-      "acertos": [
-        9
-      ]
-    },
-    {
-      "concurso": 3816,
-      "quantidade": 1,
-      "jogos": [
-        [
-          1,
-          2,
-          3,
-          4,
-          7,
-          8,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          18,
-          24,
-          25
-        ]
-      ],
-      "hashes": [
-        "1f1b9cd97cd0d6d9e407738966c07f0b625a968d5da79fcd7e1ff16e90ae0e73"
-      ],
-      "origem": "espectro_morno",
-      "acertos": [
-        10
-      ]
-    },
-    {
-      "concurso": 3816,
-      "quantidade": 1,
-      "jogos": [
-        [
-          2,
-          3,
-          5,
-          7,
-          8,
-          10,
-          11,
-          12,
-          14,
-          15,
-          16,
-          21,
-          22,
-          23,
-          25
-        ]
-      ],
-      "hashes": [
-        "a6d4720801261d29500f6116958dfd12296f7359105e99b57c4a90495899d68d"
+        "de7abab10c0aea2ee845e89bda68ab98b9e62aeea9c257967a07ab28efdd86ac"
       ],
       "origem": "espectro_quente",
       "acertos": [
@@ -2127,18 +2161,48 @@
       ]
     },
     {
-      "concurso": 3817,
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          8,
+          9,
+          10,
+          11,
+          12,
+          16,
+          18,
+          19,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "57135ba107334e2c700ba5af50b6ab87aa2e664b74917d271ddc15bdf646d310"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        11
+      ]
+    },
+    {
+      "concurso": 3826,
       "quantidade": 1,
       "jogos": [
         [
           1,
           3,
           4,
-          5,
           7,
           8,
-          12,
-          14,
+          9,
+          10,
+          13,
           15,
           16,
           19,
@@ -2149,127 +2213,7 @@
         ]
       ],
       "hashes": [
-        "8d748829c7311c6593bc8d16ffdf3b51ba526b6dab9245d753a71f7d90e4a4ff"
-      ],
-      "origem": "espectro_frio",
-      "acertos": [
-        8
-      ]
-    },
-    {
-      "concurso": 3817,
-      "quantidade": 1,
-      "jogos": [
-        [
-          1,
-          4,
-          5,
-          6,
-          8,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          18,
-          20,
-          21,
-          25
-        ]
-      ],
-      "hashes": [
-        "33b17d6359cee6057375759787d09653759d1410590a62e55ae08e9c6a0c7a68"
-      ],
-      "origem": "espectro_morno",
-      "acertos": [
-        9
-      ]
-    },
-    {
-      "concurso": 3817,
-      "quantidade": 1,
-      "jogos": [
-        [
-          3,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          13,
-          17,
-          18,
-          22,
-          23,
-          24,
-          25
-        ]
-      ],
-      "hashes": [
-        "8398ca6dd296582085c91555d166f0a9c93bdc0897aad5a0e22cad745ad1e21f"
-      ],
-      "origem": "espectro_quente",
-      "acertos": [
-        10
-      ]
-    },
-    {
-      "concurso": 3818,
-      "quantidade": 1,
-      "jogos": [
-        [
-          1,
-          2,
-          3,
-          4,
-          6,
-          10,
-          11,
-          12,
-          13,
-          15,
-          19,
-          20,
-          21,
-          22,
-          23
-        ]
-      ],
-      "hashes": [
-        "49ba81d86bbb1698402c0ea1459f9b75a778a0b8450a8f5fa636b1f6a64164da"
-      ],
-      "origem": "espectro_frio",
-      "acertos": [
-        10
-      ]
-    },
-    {
-      "concurso": 3818,
-      "quantidade": 1,
-      "jogos": [
-        [
-          1,
-          2,
-          3,
-          4,
-          5,
-          9,
-          10,
-          12,
-          13,
-          14,
-          17,
-          19,
-          20,
-          22,
-          23
-        ]
-      ],
-      "hashes": [
-        "d141eed618d7b0be17a3c4ee2e94c2f889d063cec29337368e76800ac98fb7ed"
+        "d83c16f27f614426f5a887c022a00b43948b0a2257b58505ba54aa1e2a48dd59"
       ],
       "origem": "espectro_morno",
       "acertos": [
@@ -2277,7 +2221,937 @@
       ]
     },
     {
-      "concurso": 3818,
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          3,
+          4,
+          6,
+          7,
+          10,
+          11,
+          12,
+          13,
+          15,
+          16,
+          19,
+          22,
+          23,
+          24
+        ]
+      ],
+      "hashes": [
+        "d2cd5dcb9e74916c4eeb03c2d466ff05851dc08d3ffba5767936aa44b4f2e887"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          3,
+          4,
+          6,
+          7,
+          8,
+          10,
+          11,
+          12,
+          13,
+          14,
+          19,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "48d680b339282d355cba8b0e46e26d98f030419cbddf9c8f5af2bf2b22e478fe"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          9,
+          10,
+          11,
+          12,
+          14,
+          17,
+          18,
+          19,
+          21,
+          22,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "5acd689bfa76576f4ae1a3b3daec421d4d7aeb88f1ee37aeba0c2731e9f59906"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          7,
+          9,
+          10,
+          12,
+          13,
+          16,
+          18,
+          19,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "6638e9a55dd29779cd70188845bad3a0dd13aceda03fb510280a4a5f9a0bcde8"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        12
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          7,
+          8,
+          9,
+          11,
+          13,
+          16,
+          18,
+          19,
+          20,
+          25
+        ]
+      ],
+      "hashes": [
+        "66369d0ada35684a89f24661e380f7e3d206504ef879916d2189edcfec132320"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          4,
+          5,
+          6,
+          7,
+          8,
+          10,
+          11,
+          12,
+          13,
+          14,
+          17,
+          21,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "9f00e7b2ca1576ad30bb33d2ce1ddab7d0b53d0de148863b1fc6d8c984274fde"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          4,
+          7,
+          8,
+          9,
+          10,
+          11,
+          13,
+          14,
+          15,
+          16,
+          21,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "3900067e8fd6bed5474d1469a1812d42fe9afa9d5256003c9579925687e8700e"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          4,
+          5,
+          6,
+          8,
+          10,
+          12,
+          14,
+          16,
+          17,
+          19,
+          22,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "d303d42203e2c29f20e467522c71849e84528f791b16c5d21624e537b9e0b2fa"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          4,
+          6,
+          7,
+          8,
+          10,
+          12,
+          13,
+          14,
+          15,
+          16,
+          19,
+          21,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "7e5a061c72a9ed599b536478562647cf5249d621b53acfbcc60ab93d4ad6808d"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          5,
+          7,
+          9,
+          10,
+          11,
+          12,
+          14,
+          15,
+          18,
+          19,
+          21,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "c7cc2257dcf2fda06e3b68d2bbdcb566b6bf9e9c00c8fedab9eccdb1a24d587d"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        11
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          3,
+          4,
+          5,
+          6,
+          7,
+          12,
+          13,
+          15,
+          16,
+          18,
+          20,
+          21,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "3d16182896d41244006210be0255a8822f9f4a63fe318f92d4f815293ee9fd0b"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          9,
+          10,
+          11,
+          13,
+          15,
+          16,
+          17,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "7f1fd55f5fcd82e13f93145c74b385e963449ded4157a7f6406d7b00cf7bbb88"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          3,
+          5,
+          6,
+          7,
+          9,
+          10,
+          11,
+          14,
+          16,
+          17,
+          18,
+          19,
+          21,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "1719b5863110c7735860fbd8ba8a835c11f3d905dd45f0cc2682fc1e2635fdf9"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          3,
+          4,
+          5,
+          7,
+          8,
+          9,
+          12,
+          13,
+          15,
+          16,
+          17,
+          18,
+          21,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "89d5897ba9fb1efea1896b2f9356d1f9b872cb2ec8272c73f080aaf3276269bf"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        11
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          4,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          15,
+          18,
+          19,
+          20,
+          21,
+          23
+        ]
+      ],
+      "hashes": [
+        "98f8e0d9c7fe6cc722cda1a4728544406cfaf2af3f02c1e35e00f8e08d8864e8"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          11,
+          12,
+          15,
+          16,
+          18,
+          19,
+          20,
+          21,
+          22
+        ]
+      ],
+      "hashes": [
+        "62133ede95d90a2254cc2ee73d805a0fd6af0edad6ce5415de9afddf922187d8"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          6,
+          8,
+          12,
+          14,
+          15,
+          17,
+          19,
+          22,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "95d12cafa4fc9a6387b6d6cc7f8f4afccb01316bcfe4cece4f23fce3cc9acf64"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        11
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          4,
+          6,
+          7,
+          10,
+          12,
+          13,
+          15,
+          16,
+          17,
+          18,
+          20,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "a6ccf775c3fbc78ebd53ef3372901e147e71b00fda216c74058d277f0028a69a"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        7
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          7,
+          8,
+          10,
+          11,
+          12,
+          13,
+          15,
+          17,
+          19,
+          20,
+          21,
+          24
+        ]
+      ],
+      "hashes": [
+        "df5bd735ae0f8c71bf95d14e003ae916c56e9cd1f0e849c714579ac67749c428"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          5,
+          6,
+          8,
+          9,
+          11,
+          12,
+          13,
+          15,
+          17,
+          18,
+          19,
+          20,
+          24
+        ]
+      ],
+      "hashes": [
+        "12d5432e6114606db25a43556689ef36dbf4381c8e4ecc0101e3a684749867a5"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        11
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          7,
+          9,
+          11,
+          12,
+          13,
+          14,
+          16,
+          20,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "d5026ad03c412e4c093588bef883b655deac3768400585bd5d959c9715369381"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          3,
+          4,
+          6,
+          7,
+          10,
+          11,
+          12,
+          13,
+          14,
+          17,
+          20,
+          22,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "1a85df02b4bad67a499a9d858d28fee4154a0476ea8d9a777cfadbf08e42349f"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        6
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          9,
+          10,
+          11,
+          13,
+          14,
+          15,
+          17,
+          18,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "688c0abc0cb0262b5087a6ac6e8e5ebb5bf75c7a4eb696674650e52d20d5a50d"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        11
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          5,
+          6,
+          8,
+          11,
+          12,
+          14,
+          16,
+          18,
+          20,
+          21,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "4d7e32191f92ae2f696da90669d642fbd75aae997e1d6b26126c3e1994c883c2"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          9,
+          10,
+          12,
+          13,
+          14,
+          17,
+          20,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "f9bba615305f198cd3c791e30b3ab78a735610bcf4ac51c62e9aec4093af5a26"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          5,
+          6,
+          8,
+          9,
+          10,
+          11,
+          13,
+          15,
+          18,
+          19,
+          21,
+          22,
+          24
+        ]
+      ],
+      "hashes": [
+        "51ab585ec68245a9574a51af8fb7df9c857f81523912d9d0122bfb46d8620e42"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        12
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          9,
+          10,
+          11,
+          12,
+          14,
+          15,
+          17,
+          18,
+          20,
+          21,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "3691503148dfd3bbe745258d21988c32364d8a7e3006b21934597a268fc6b9c2"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          5,
+          8,
+          9,
+          10,
+          11,
+          12,
+          15,
+          16,
+          17,
+          19,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "905535e3e31c97e0d7d35feaec842519aabd99a142cc5b90e5dd208070a37b6c"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        11
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          4,
+          5,
+          6,
+          7,
+          10,
+          11,
+          12,
+          13,
+          16,
+          18,
+          20,
+          21,
+          22,
+          23
+        ]
+      ],
+      "hashes": [
+        "78c1a89aba8b42af6f1aaf83cec24f0b497ee9c8cd2928f22a89a081ad207bc4"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        7
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          9,
+          11,
+          12,
+          13,
+          14,
+          18,
+          20,
+          22,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "7ff3e94ae33325ca14a028903b5a1c0b2e95f65dd1dc5ecbf0a1762de7d095ff"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          6,
+          7,
+          8,
+          9,
+          11,
+          14,
+          15,
+          16,
+          17,
+          20,
+          21,
+          22,
+          24
+        ]
+      ],
+      "hashes": [
+        "7f544ab20e9947e95e87ac85d1c9f2f3e7a3a1e03eaf185ef8b679907a0f26b2"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
       "quantidade": 1,
       "jogos": [
         [
@@ -2286,20 +3160,620 @@
           4,
           5,
           7,
+          9,
+          10,
+          13,
+          14,
+          16,
+          17,
+          18,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "3034acc93a91657f57b5c2608e934c8c8007a6b63d88aa9e823fc49ceede1cb2"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          6,
+          7,
+          9,
           10,
           11,
           12,
+          16,
+          18,
+          19,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "7084c925acb85e86f476eaa6c15b6a39f392c525ee36806702a3e21ae2446656"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          3,
+          5,
+          6,
+          9,
+          10,
+          11,
+          12,
+          14,
+          17,
+          18,
+          19,
+          20,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "d7c9d6d9551b564f2540733500f6a20b68e08af0f7a7b161e9680340976cf355"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          7,
+          10,
+          11,
+          12,
+          14,
+          18,
+          19,
+          20,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "f57dce92af8e7415825da92a17195a7d73f9e06a3485c312aaa8a0c83d327886"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          6,
+          7,
+          8,
+          10,
+          11,
+          12,
+          14,
+          15,
+          18,
+          19,
+          21,
+          22
+        ]
+      ],
+      "hashes": [
+        "1db176cafbbfc2be5426615156cd9a467e9d44a04b668f97a0ef2e05304bb393"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          7,
+          9,
+          12,
+          13,
+          14,
+          15,
+          20,
+          21,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "112e447b862e3ed9ad4f6e6349cf836efefd81141c362844eab5a5752e23372c"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          9,
+          10,
+          13,
+          18,
+          19,
+          20,
+          21,
+          22,
+          24
+        ]
+      ],
+      "hashes": [
+        "cc77919c70643c217eb58f6200520e0f20dab6c5ce30345ed0eb2f3dd05b9753"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        11
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          7,
+          9,
+          10,
+          12,
+          13,
+          16,
+          17,
+          19,
+          21,
+          23
+        ]
+      ],
+      "hashes": [
+        "b40ebaf181c0e36f00538cb60add616f3d47b68ece69dfcbec7e4998df15bfc3"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          6,
+          8,
+          10,
+          11,
+          12,
+          13,
+          14,
+          17,
+          20,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "36d3cf76fcf301587f292168d2afb10e40105a82db2b5d9b58161712e852352f"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        7
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          3,
+          4,
+          5,
+          8,
+          9,
+          11,
+          12,
+          13,
+          15,
+          16,
+          19,
+          21,
+          22,
+          24
+        ]
+      ],
+      "hashes": [
+        "c50e6cd561ec306376c0a603f5d54efb01193bda7be01b9e2df9340ebd60bbb4"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        12
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          3,
+          4,
+          5,
+          6,
+          7,
+          11,
+          12,
+          13,
           15,
           16,
           18,
           19,
+          21,
+          22,
+          23
+        ]
+      ],
+      "hashes": [
+        "a25e77a0d826a277434c47cbf019d888d9fb60e31b92843882926eabd19784f0"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          4,
+          6,
+          8,
+          10,
+          11,
+          12,
+          14,
+          15,
+          17,
+          20,
+          21,
+          22,
+          23
+        ]
+      ],
+      "hashes": [
+        "136b22435a654cecd3efffad49639060093e8ae6008192645ee34498d2ff881a"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        7
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          3,
+          4,
+          5,
+          6,
+          8,
+          9,
+          12,
+          14,
+          16,
+          17,
+          18,
+          20,
+          21,
+          22,
+          23
+        ]
+      ],
+      "hashes": [
+        "20416e572dde37e5582edfc79d5dc498ebcebc0e1677100c5ff6acafda79c806"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          4,
+          5,
+          6,
+          8,
+          9,
+          11,
+          13,
+          16,
+          17,
+          18,
+          19,
+          22,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "e1893141429ea8f9f96bdac764e8737776253a375be5eb08c0ef8c497d8d5dd7"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          7,
+          9,
+          11,
+          12,
+          14,
+          16,
+          18,
+          21,
           22,
           23,
           24
         ]
       ],
       "hashes": [
-        "4ec9e7aedb40229781a513b65944c3331f91d313b567b656d359ac0e4b7c2e02"
+        "9404c2e1d0c2010aed27430b084cd57678a62a3efffd2dcecab790fed35c8ef0"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          6,
+          7,
+          8,
+          9,
+          13,
+          16,
+          18,
+          19,
+          20,
+          21,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "29c0338ece1360a74e4201d03a84206d4ea3ed051e31beaac208f12a2cb4718d"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          6,
+          8,
+          9,
+          10,
+          11,
+          13,
+          14,
+          15,
+          18,
+          20,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "35d8a73bdc17890dee5291729ed8adab40b3c4ee8534da8ae5bc4a86b998a566"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          6,
+          7,
+          8,
+          9,
+          13,
+          15,
+          17,
+          18,
+          19,
+          20,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "61100e3be75cac6517fcb0a98b585428aa1428a4dd1f24937338b9821a076562"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        11
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          3,
+          5,
+          8,
+          9,
+          10,
+          11,
+          12,
+          14,
+          16,
+          18,
+          19,
+          20,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "b28fd0dc83d8526d5fa2eb325359f5f66cf2bdc8ababa36e0b73202203896a66"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          7,
+          9,
+          10,
+          11,
+          12,
+          14,
+          15,
+          16,
+          20,
+          21,
+          22
+        ]
+      ],
+      "hashes": [
+        "7e73ffd4e49ecd3fa3839a0b2acace31aea6bb6e9a361208c478b598cb1b83da"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          6,
+          8,
+          11,
+          13,
+          14,
+          15,
+          16,
+          19,
+          20,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "357f4750fe0ff257dec668396b33df87cb1201f80835b9df5555983331fdf222"
       ],
       "origem": "espectro_quente",
       "acertos": [
@@ -2307,35 +3781,7 @@
       ]
     },
     {
-      "concurso": 3820,
-      "quantidade": 1,
-      "jogos": [
-        [
-          1,
-          2,
-          6,
-          8,
-          9,
-          10,
-          13,
-          15,
-          16,
-          18,
-          19,
-          20,
-          23,
-          24,
-          25
-        ]
-      ],
-      "hashes": [
-        "117e40058773e4b6fd2cd8572f17968cb0ba9be5353b0f54946dffdf239f2574"
-      ],
-      "origem": "espectro_frio",
-      "acertos": []
-    },
-    {
-      "concurso": 3820,
+      "concurso": 3826,
       "quantidade": 1,
       "jogos": [
         [
@@ -2343,13 +3789,763 @@
           2,
           4,
           6,
+          7,
+          8,
+          14,
+          15,
+          16,
+          17,
+          20,
+          21,
+          22,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "f6d093f0d9609f044b17c3e35d9040e92e0b63654b367354efc4dc90afa88bbd"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        7
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          7,
+          10,
+          12,
+          13,
+          14,
+          15,
+          18,
+          20,
+          21,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "efa6b1e0688f3bb61bed2544a983c048fb5a508dc48a55b4e3e383e63cbb48a1"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        11
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          4,
+          5,
+          7,
+          8,
+          9,
+          14,
+          15,
+          17,
+          18,
+          20,
+          21,
+          22,
+          24
+        ]
+      ],
+      "hashes": [
+        "6e1b3fb34057cec5584aac164e9a5d9647dab6e0b61ca0db4494111fbb39f12f"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          4,
+          6,
+          7,
           8,
           11,
+          13,
+          14,
+          15,
+          17,
+          18,
+          19,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "3acb46d72a2300e6d095e39a927e58acf518a02ea22027120fc807ed3a562e98"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          4,
+          5,
+          8,
+          11,
+          13,
+          14,
+          15,
+          16,
+          17,
+          19,
+          20,
+          21,
+          24
+        ]
+      ],
+      "hashes": [
+        "814b4915ec28433c665b84fe3142ad0719a123a7bf7d9e7cc8d2bc80ff31d56e"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          7,
+          8,
           12,
+          14,
+          16,
+          18,
+          19,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "f85dff9756e1e1c2522dde299b228413c25f25c391938a2064a2a6f68bda4947"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          4,
+          5,
+          6,
+          7,
+          8,
+          13,
+          15,
+          16,
+          17,
+          19,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "87ad320bd615d80ee1b67aadc825af3fd427be739f2118724375a8042ea93af5"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          3,
+          5,
+          7,
+          8,
+          10,
+          11,
+          12,
+          13,
+          14,
+          17,
+          18,
+          20,
+          21,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "648ac5f1ed7f45f251266daf3b49f420c47723f79d8c3b48846a420ff9a1091f"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          3,
+          5,
+          6,
+          7,
+          9,
+          10,
+          13,
+          14,
+          15,
+          16,
+          19,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "f9c3a5eea1700e500f5bda771974ac4ec08d598d3de3f1027536fefe82d4d151"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          3,
+          4,
+          5,
+          6,
+          7,
+          11,
+          12,
+          13,
+          15,
+          16,
+          19,
+          20,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "a741fecc0e25dc9ae23d8011a96cd3d545f4d28e9b16445817a069343630aa74"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          3,
+          4,
+          5,
+          6,
+          8,
+          9,
+          11,
+          12,
+          13,
+          16,
+          17,
+          20,
+          21,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "5dc0b913d9d7ecdc9e8e082ad5fab615334f7c5241b47f9b809f28df5189bd52"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          6,
+          7,
+          8,
+          10,
+          11,
+          14,
+          15,
+          16,
+          17,
+          20,
+          21,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "9886e78e232db83d7c46cde582e3bf7cabe16dda9c4e0842f64b9572af4d7637"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        7
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          7,
+          8,
+          9,
+          10,
+          12,
+          13,
+          17,
+          20,
+          21,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "589d8317c485bde2f2577fb8efb2d3078f4cb9b9fda344fba17333aa2de00c14"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          4,
+          5,
+          7,
+          10,
+          12,
+          13,
+          14,
+          15,
+          16,
+          18,
+          21,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "186f007cc9481043a1fe41eb6aa29b51dec9b00ae03a957e4e311386ab9d0060"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          7,
+          9,
+          10,
+          12,
+          13,
+          15,
+          16,
+          21,
+          22,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "b394be64bce2351975dd7bc8b9819d53c13151e7e62719089dde98aa8d3a7150"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          8,
+          9,
+          10,
+          12,
+          14,
+          18,
+          20,
+          21,
+          22,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "1803e8c65b4011a57fe8f4966b35121fe3bc53a8145513d1708b727440262964"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        11
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          4,
+          5,
+          6,
+          8,
+          9,
+          11,
+          12,
+          13,
+          14,
+          18,
+          22,
+          23,
+          24
+        ]
+      ],
+      "hashes": [
+        "58a2372b8ed65d28e9b0a3d6b6aacbe125938c3dd116c69e8d573663e2264da2"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          4,
+          5,
+          6,
+          7,
+          8,
+          12,
+          15,
+          16,
+          18,
+          19,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "fc5ffb4b1e326cb3418eaf3df400f6331d5376820285b97d2ab5622deb8b5b8a"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          7,
+          10,
+          12,
+          13,
+          15,
+          18,
+          19,
+          20,
+          21,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "873d6b0e258380b04d22648becc13f6ef525e1604cdc7e282f1de84de554403b"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          9,
+          13,
+          14,
+          16,
+          17,
+          19,
+          20,
+          22,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "d2854f1fea7eeaa0d2afd537da1cd8dba731102065d8ba0f8638a8ed1910b3b7"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          4,
+          5,
+          6,
+          7,
+          8,
+          10,
+          14,
           16,
           17,
           18,
           21,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "67cd9b2326eb397077c636629e56af12c4dbfd3cb6ec5c9b7eb74cd25e192026"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        7
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          4,
+          5,
+          9,
+          10,
+          11,
+          12,
+          14,
+          16,
+          17,
+          18,
+          19,
+          21,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "471cc3c1a21ea5db47f69f97291248808d46d590f0a2dc4f46c71a1b051962ca"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          7,
+          11,
+          13,
+          14,
+          17,
+          19,
+          20,
+          21,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "d61d34c38e28cbbb734172bddf448cf2568b76f9ecf13736d94c985e05f66f81"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          3,
+          4,
+          7,
+          9,
+          10,
+          11,
+          13,
+          14,
+          17,
+          18,
+          20,
+          22,
+          23,
+          24
+        ]
+      ],
+      "hashes": [
+        "c0cc1c33508d089e87be39e7f0218cd8d9b66ae309894fe23302f66e40554eb9"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        7
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          5,
+          6,
+          7,
+          11,
+          13,
+          14,
+          15,
+          17,
+          18,
+          19,
+          20,
+          22,
+          24
+        ]
+      ],
+      "hashes": [
+        "e1e32b43a67fc2d16743caac801c5f928186a5cb5eedd2d9fc5bb136817dda40"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          5,
+          6,
+          8,
+          9,
+          14,
+          15,
+          16,
+          19,
+          20,
           22,
           23,
           24,
@@ -2357,25 +4553,207 @@
         ]
       ],
       "hashes": [
-        "16f817d29260b6336833dbfd1d478520dcf7453d457a5fe2b605d615d527f571"
+        "465abacfb29c5c25fa219bbe4b056bc474834a5de295e7ef13beaed3a27bc08a"
       ],
       "origem": "espectro_morno",
-      "acertos": []
+      "acertos": [
+        10
+      ]
     },
     {
-      "concurso": 3820,
+      "concurso": 3826,
       "quantidade": 1,
       "jogos": [
         [
           1,
+          2,
+          3,
+          7,
+          8,
+          10,
+          11,
+          13,
+          15,
+          16,
+          18,
+          20,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "639f476e30ead55aecba812b6ec8dd8d3c6575681523e349d5d20cc11eb46589"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          6,
+          10,
+          11,
+          13,
+          15,
+          16,
+          17,
+          18,
+          19,
+          22,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "79a2983c21820b4ec04989c371e49de17ef790d9fd805fdd8fd4a31a8e6e0f2a"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          6,
+          7,
+          10,
+          12,
+          13,
+          14,
+          15,
+          18,
+          20,
+          21,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "b6d59f3fc8bb6d8ccf00a1b6fc9ffecd7dc60960c72d41ae766ecba47a50aad9"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          10,
+          12,
+          15,
+          17,
+          18,
+          20,
+          21,
+          23,
+          24
+        ]
+      ],
+      "hashes": [
+        "d346325e763e9f711292ac0fc1b7689d102c3f1ff22284395ddffaa7d95cffec"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
           4,
           5,
           6,
+          9,
+          10,
+          11,
+          13,
+          14,
+          15,
+          17,
+          18,
+          21,
+          24
+        ]
+      ],
+      "hashes": [
+        "c221459b06e42ba3926cc2ddef82c9a0d4410f3d011a56242de9422b3f14d5de"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          6,
           7,
+          8,
+          9,
+          13,
+          15,
+          16,
+          17,
+          18,
+          20,
+          21,
+          22,
+          24
+        ]
+      ],
+      "hashes": [
+        "b44031804f42610fccf7e8fd69ef02d51d0d4f81ffc2e7afc5966f96ac87d95d"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          6,
+          8,
           9,
           10,
           13,
-          16,
+          14,
           17,
           18,
           19,
@@ -2385,7 +4763,1291 @@
         ]
       ],
       "hashes": [
-        "cefd0e09866e5e2ab6a5fdc9ef1a0bd2223588b141692e533c19603e5069ad4a"
+        "0d965b261bc16ba4521ed782b3cdd1391f152752f59b40f953d5f55dd86308a5"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          7,
+          8,
+          10,
+          12,
+          14,
+          15,
+          19,
+          20,
+          21,
+          22,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "1ab1a92f28df645d8c94e532df20e96a04b8acfb633b5e653b33d3db3ebc1aac"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          3,
+          6,
+          8,
+          9,
+          10,
+          13,
+          14,
+          15,
+          16,
+          17,
+          19,
+          21,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "454a62bc0873213eff96b6a20389563323a3fcc14c3c4aa4c47bf0d5d524ed48"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          5,
+          6,
+          9,
+          10,
+          11,
+          12,
+          13,
+          16,
+          17,
+          19,
+          22,
+          23,
+          24
+        ]
+      ],
+      "hashes": [
+        "3710852fe4c868e6cd2a21bd1fbf66fddac1231c5eb02d521d00402d6a15f7f7"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          5,
+          6,
+          7,
+          8,
+          9,
+          12,
+          13,
+          15,
+          17,
+          18,
+          20,
+          21,
+          22,
+          23
+        ]
+      ],
+      "hashes": [
+        "6578a9d107e1cb1c49bb2ba08a44ef11e13896dc84b0cfcecb770df904d7df4a"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          9,
+          10,
+          12,
+          14,
+          15,
+          16,
+          17,
+          20,
+          21,
+          22,
+          24
+        ]
+      ],
+      "hashes": [
+        "1ece332f09a19657dd059713c78d08d6afaa59dc69f33f41ea34f8c268059f38"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          9,
+          10,
+          11,
+          13,
+          15,
+          16,
+          18,
+          19,
+          21,
+          22,
+          23
+        ]
+      ],
+      "hashes": [
+        "f40c174b893b9ebb3d39dfb0bbce6b4b7a089791e7c097dc7a88e6856200f61e"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          5,
+          6,
+          7,
+          8,
+          10,
+          13,
+          14,
+          15,
+          16,
+          18,
+          20,
+          21,
+          22,
+          23
+        ]
+      ],
+      "hashes": [
+        "7b1ce0f3ab29bf235e259a9ff9088f84b9255c16bb1acf97e7a2c825ccc00cce"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          4,
+          6,
+          7,
+          8,
+          10,
+          11,
+          12,
+          13,
+          16,
+          18,
+          19,
+          20,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "08e8a92a34dec4ce3470ab0c8fd4b375d8ef32e7a9217b7a7623d0c832f947f3"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        7
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          6,
+          8,
+          10,
+          12,
+          14,
+          17,
+          18,
+          19,
+          20,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "0be77146b0866e243b57e4b589a43a58ab077f2934a293d8551f7b491204043a"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          6,
+          7,
+          8,
+          9,
+          11,
+          13,
+          17,
+          18,
+          20,
+          21,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "3bec46be9b62bb189325af7781014e59d8d47b1bf8559be6d7e3fe76561ff4fe"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          6,
+          8,
+          10,
+          11,
+          12,
+          13,
+          15,
+          17,
+          18,
+          19,
+          20,
+          25
+        ]
+      ],
+      "hashes": [
+        "831cac84e9ddfb0699f39916e82d5bd5be8177ce1ba6fefd909dc17be014aeb8"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          7,
+          8,
+          9,
+          12,
+          14,
+          15,
+          18,
+          19,
+          20,
+          22,
+          24
+        ]
+      ],
+      "hashes": [
+        "8a4beaa1582f7812d04375c2fafbd4d215d4db63e01cfa3450f540d51d445e1f"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        12
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          7,
+          8,
+          10,
+          11,
+          13,
+          16,
+          17,
+          18,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "a98b32c6b2b2732c20d3b0f6c80f4ec7178b96b44b0df106e896ac6a8765ac9d"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          6,
+          11,
+          12,
+          13,
+          15,
+          16,
+          17,
+          18,
+          20,
+          21,
+          25
+        ]
+      ],
+      "hashes": [
+        "ec01e6c2ab0bad323c51c96b77e29bbae2adf7f6af96c6e6fe8037200da678df"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          6,
+          8,
+          10,
+          15,
+          16,
+          17,
+          18,
+          19,
+          21,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "e31d2942a3316065378a5744d68621da1aaff005dbee29e6e5c441775a8ff2ab"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          9,
+          10,
+          11,
+          12,
+          14,
+          15,
+          17,
+          18,
+          20,
+          21,
+          22
+        ]
+      ],
+      "hashes": [
+        "1e82e38e6d7d46ea62427fdfaa0b345f69a5f39921860e1ad1a67a52ad6c43b6"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          6,
+          9,
+          11,
+          12,
+          13,
+          14,
+          19,
+          20,
+          22,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "974257e45e61e2cf9392f5c50cce41cb0dae2d8fbe15b8ff566742e350d87ade"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          6,
+          7,
+          9,
+          11,
+          12,
+          13,
+          15,
+          16,
+          21,
+          22,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "db8eb85e612173a833e11cb968e4fbc5e797eba3c7f62fe23e45741286818fd2"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          4,
+          5,
+          6,
+          8,
+          9,
+          10,
+          11,
+          13,
+          14,
+          15,
+          18,
+          19,
+          21,
+          22
+        ]
+      ],
+      "hashes": [
+        "e296a7e7f84868a03d8ebff9bcf02894007e4f20cae82ed9ade7875c6ff82a8d"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          4,
+          5,
+          7,
+          8,
+          11,
+          12,
+          13,
+          16,
+          17,
+          18,
+          20,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "a5cab9a6f8ac8bf02c0dd8eac76689029f0dd03b9dd0ea511fd378156afbcf18"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        8
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          6,
+          7,
+          10,
+          12,
+          15,
+          16,
+          18,
+          19,
+          20,
+          22,
+          23
+        ]
+      ],
+      "hashes": [
+        "7a26ce547f1caaff128a9358be735d4ca7e5c314138a2b178c6bea5a74ddf6cc"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        9
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          8,
+          10,
+          12,
+          13,
+          14,
+          15,
+          16,
+          19,
+          21,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "1c841eba6b3c06822ec60363208fdbd44b84c1a6754baefddfc880691e23af41"
+      ],
+      "origem": "espectro_frio",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          5,
+          6,
+          8,
+          10,
+          13,
+          15,
+          16,
+          17,
+          18,
+          19,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "21d2659e0aef97dd80f44a7f5efdf26974f47cc15a8e2a63e306fa570b23e617"
+      ],
+      "origem": "espectro_morno",
+      "acertos": [
+        10
+      ]
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          3,
+          4,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          14,
+          16,
+          21,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "bb190d07c34ad64440283871e863d13408f6c0af6c5dd29523d34d70c8be61f7"
+      ],
+      "origem": "espectro_quente",
+      "acertos": [
+        9
+      ]
+    }
+  ],
+  "ultimos_palpites": [
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          9,
+          10,
+          12,
+          14,
+          15,
+          16,
+          17,
+          20,
+          21,
+          22,
+          24
+        ]
+      ],
+      "hashes": [
+        "1ece332f09a19657dd059713c78d08d6afaa59dc69f33f41ea34f8c268059f38"
+      ],
+      "origem": "espectro_morno",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          9,
+          10,
+          11,
+          13,
+          15,
+          16,
+          18,
+          19,
+          21,
+          22,
+          23
+        ]
+      ],
+      "hashes": [
+        "f40c174b893b9ebb3d39dfb0bbce6b4b7a089791e7c097dc7a88e6856200f61e"
+      ],
+      "origem": "espectro_quente",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          5,
+          6,
+          7,
+          8,
+          10,
+          13,
+          14,
+          15,
+          16,
+          18,
+          20,
+          21,
+          22,
+          23
+        ]
+      ],
+      "hashes": [
+        "7b1ce0f3ab29bf235e259a9ff9088f84b9255c16bb1acf97e7a2c825ccc00cce"
+      ],
+      "origem": "espectro_frio",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          4,
+          6,
+          7,
+          8,
+          10,
+          11,
+          12,
+          13,
+          16,
+          18,
+          19,
+          20,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "08e8a92a34dec4ce3470ab0c8fd4b375d8ef32e7a9217b7a7623d0c832f947f3"
+      ],
+      "origem": "espectro_morno",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          6,
+          8,
+          10,
+          12,
+          14,
+          17,
+          18,
+          19,
+          20,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "0be77146b0866e243b57e4b589a43a58ab077f2934a293d8551f7b491204043a"
+      ],
+      "origem": "espectro_quente",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          6,
+          7,
+          8,
+          9,
+          11,
+          13,
+          17,
+          18,
+          20,
+          21,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "3bec46be9b62bb189325af7781014e59d8d47b1bf8559be6d7e3fe76561ff4fe"
+      ],
+      "origem": "espectro_frio",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          6,
+          8,
+          10,
+          11,
+          12,
+          13,
+          15,
+          17,
+          18,
+          19,
+          20,
+          25
+        ]
+      ],
+      "hashes": [
+        "831cac84e9ddfb0699f39916e82d5bd5be8177ce1ba6fefd909dc17be014aeb8"
+      ],
+      "origem": "espectro_morno",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          7,
+          8,
+          9,
+          12,
+          14,
+          15,
+          18,
+          19,
+          20,
+          22,
+          24
+        ]
+      ],
+      "hashes": [
+        "8a4beaa1582f7812d04375c2fafbd4d215d4db63e01cfa3450f540d51d445e1f"
+      ],
+      "origem": "espectro_quente",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          7,
+          8,
+          10,
+          11,
+          13,
+          16,
+          17,
+          18,
+          22,
+          25
+        ]
+      ],
+      "hashes": [
+        "a98b32c6b2b2732c20d3b0f6c80f4ec7178b96b44b0df106e896ac6a8765ac9d"
+      ],
+      "origem": "espectro_frio",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          6,
+          11,
+          12,
+          13,
+          15,
+          16,
+          17,
+          18,
+          20,
+          21,
+          25
+        ]
+      ],
+      "hashes": [
+        "ec01e6c2ab0bad323c51c96b77e29bbae2adf7f6af96c6e6fe8037200da678df"
+      ],
+      "origem": "espectro_morno",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          6,
+          8,
+          10,
+          15,
+          16,
+          17,
+          18,
+          19,
+          21,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "e31d2942a3316065378a5744d68621da1aaff005dbee29e6e5c441775a8ff2ab"
+      ],
+      "origem": "espectro_quente",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          9,
+          10,
+          11,
+          12,
+          14,
+          15,
+          17,
+          18,
+          20,
+          21,
+          22
+        ]
+      ],
+      "hashes": [
+        "1e82e38e6d7d46ea62427fdfaa0b345f69a5f39921860e1ad1a67a52ad6c43b6"
+      ],
+      "origem": "espectro_frio",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          6,
+          9,
+          11,
+          12,
+          13,
+          14,
+          19,
+          20,
+          22,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "974257e45e61e2cf9392f5c50cce41cb0dae2d8fbe15b8ff566742e350d87ade"
+      ],
+      "origem": "espectro_morno",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          6,
+          7,
+          9,
+          11,
+          12,
+          13,
+          15,
+          16,
+          21,
+          22,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "db8eb85e612173a833e11cb968e4fbc5e797eba3c7f62fe23e45741286818fd2"
+      ],
+      "origem": "espectro_quente",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          4,
+          5,
+          6,
+          8,
+          9,
+          10,
+          11,
+          13,
+          14,
+          15,
+          18,
+          19,
+          21,
+          22
+        ]
+      ],
+      "hashes": [
+        "e296a7e7f84868a03d8ebff9bcf02894007e4f20cae82ed9ade7875c6ff82a8d"
+      ],
+      "origem": "espectro_frio",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          4,
+          5,
+          7,
+          8,
+          11,
+          12,
+          13,
+          16,
+          17,
+          18,
+          20,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "a5cab9a6f8ac8bf02c0dd8eac76689029f0dd03b9dd0ea511fd378156afbcf18"
+      ],
+      "origem": "espectro_morno",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          3,
+          5,
+          6,
+          7,
+          10,
+          12,
+          15,
+          16,
+          18,
+          19,
+          20,
+          22,
+          23
+        ]
+      ],
+      "hashes": [
+        "7a26ce547f1caaff128a9358be735d4ca7e5c314138a2b178c6bea5a74ddf6cc"
+      ],
+      "origem": "espectro_quente",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          2,
+          3,
+          4,
+          5,
+          8,
+          10,
+          12,
+          13,
+          14,
+          15,
+          16,
+          19,
+          21,
+          23,
+          25
+        ]
+      ],
+      "hashes": [
+        "1c841eba6b3c06822ec60363208fdbd44b84c1a6754baefddfc880691e23af41"
+      ],
+      "origem": "espectro_frio",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          1,
+          2,
+          5,
+          6,
+          8,
+          10,
+          13,
+          15,
+          16,
+          17,
+          18,
+          19,
+          23,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "21d2659e0aef97dd80f44a7f5efdf26974f47cc15a8e2a63e306fa570b23e617"
+      ],
+      "origem": "espectro_morno",
+      "acertos": []
+    },
+    {
+      "concurso": 3826,
+      "quantidade": 1,
+      "jogos": [
+        [
+          3,
+          4,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          14,
+          16,
+          21,
+          22,
+          24,
+          25
+        ]
+      ],
+      "hashes": [
+        "bb190d07c34ad64440283871e863d13408f6c0af6c5dd29523d34d70c8be61f7"
       ],
       "origem": "espectro_quente",
       "acertos": []
